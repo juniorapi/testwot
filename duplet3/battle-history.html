@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
@@ -404,6 +404,78 @@
   </div>
   
   <script>
+    // На початку скрипта
+document.addEventListener('DOMContentLoaded', function() {
+  // Перевіряємо, чи потрібно видалити бій
+  const urlParams = new URLSearchParams(window.location.search);
+  const deleteBattleId = urlParams.get('deleteBattle');
+  
+  if (deleteBattleId) {
+    deleteBattleFromExternalStorage(deleteBattleId).then(success => {
+      if (success) {
+        alert(`Бій ${deleteBattleId} успішно видалено`);
+      } else {
+        alert(`Помилка при видаленні бою ${deleteBattleId}`);
+      }
+      
+      // Прибираємо параметр з URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    });
+  }
+});
+    
+    // Функція для отримання даних боїв
+async function fetchBattleData() {
+  try {
+    // Отримуємо список файлів у папці data
+    const response = await fetch('https://api.github.com/repos/juniorapi/testwot/contents/data', {
+      headers: {
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch file list: ${response.statusText}`);
+    }
+    
+    const files = await response.json();
+    let allBattles = [];
+    
+    // Отримуємо вміст кожного файлу
+    for (const file of files) {
+      if (file.name.startsWith('battles-') && file.name.endsWith('.json')) {
+        const fileResponse = await fetch(file.download_url);
+        if (fileResponse.ok) {
+          const battles = await fileResponse.json();
+          allBattles = allBattles.concat(battles);
+        }
+      }
+    }
+    
+    return allBattles;
+  } catch (e) {
+    console.error("Failed to fetch battle data:", e);
+    return [];
+  }
+}
+
+// Функція для видалення бою
+async function deleteBattle(battleId) {
+  // Якщо на сторінці battle-history.html ви не хочете зберігати токен,
+  // можна перенаправити на основну сторінку з параметром для видалення
+  
+  try {
+    if (confirm('Видалити цей бій? Ця дія перенаправить вас на основну сторінку.')) {
+      window.location.href = `https://juniorapi.github.io/testwot/duplet3/index.html?deleteBattle=${battleId}`;
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.error("Error deleting battle:", e);
+    return false;
+  }
+}
+    
     document.addEventListener('DOMContentLoaded', function() {
       // Constants
       const ITEMS_PER_PAGE = 10;
