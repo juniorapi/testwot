@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
@@ -404,803 +404,523 @@
   </div>
   
   <script>
-    // На початку скрипта
 document.addEventListener('DOMContentLoaded', function() {
-  // Перевіряємо, чи потрібно видалити бій
-  const urlParams = new URLSearchParams(window.location.search);
-  const deleteBattleId = urlParams.get('deleteBattle');
+  // Constants
+  const ITEMS_PER_PAGE = 10;
   
-  if (deleteBattleId) {
-    deleteBattleFromExternalStorage(deleteBattleId).then(success => {
-      if (success) {
-        alert(`Бій ${deleteBattleId} успішно видалено`);
-      } else {
-        alert(`Помилка при видаленні бою ${deleteBattleId}`);
-      }
-      
-      // Прибираємо параметр з URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    });
-  }
-});
-    
-    // Функція для отримання даних боїв
-async function fetchBattleData() {
-  try {
-    // Отримуємо список файлів у папці data
-    const response = await fetch('https://api.github.com/repos/juniorapi/testwot/contents/data', {
-      headers: {
-        'Accept': 'application/vnd.github.v3+json'
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch file list: ${response.statusText}`);
-    }
-    
-    const files = await response.json();
-    let allBattles = [];
-    
-    // Отримуємо вміст кожного файлу
-    for (const file of files) {
-      if (file.name.startsWith('battles-') && file.name.endsWith('.json')) {
-        const fileResponse = await fetch(file.download_url);
-        if (fileResponse.ok) {
-          const battles = await fileResponse.json();
-          allBattles = allBattles.concat(battles);
+  // State
+  let allBattles = [];
+  let currentPage = 1;
+  let filteredBattles = [];
+  
+  // Функція для отримання даних боїв з GitHub
+  async function fetchBattleData() {
+    try {
+      // Отримуємо список файлів у папці data
+      const response = await fetch('https://api.github.com/repos/juniorapi/testwot/contents/data', {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json'
         }
-      }
-    }
-    
-    return allBattles;
-  } catch (e) {
-    console.error("Failed to fetch battle data:", e);
-    return [];
-  }
-}
-
-// Функція для видалення бою
-async function deleteBattle(battleId) {
-  // Якщо на сторінці battle-history.html ви не хочете зберігати токен,
-  // можна перенаправити на основну сторінку з параметром для видалення
-  
-  try {
-    if (confirm('Видалити цей бій? Ця дія перенаправить вас на основну сторінку.')) {
-      window.location.href = `https://juniorapi.github.io/testwot/duplet3/index.html?deleteBattle=${battleId}`;
-      return true;
-    }
-    return false;
-  } catch (e) {
-    console.error("Error deleting battle:", e);
-    return false;
-  }
-}
-    
-    document.addEventListener('DOMContentLoaded', function() {
-      // Constants
-      const ITEMS_PER_PAGE = 10;
+      });
       
-      // State
+      if (!response.ok) {
+        throw new Error(`Failed to fetch file list: ${response.statusText}`);
+      }
+      
+      const files = await response.json();
       let allBattles = [];
-      let currentPage = 1;
-      let filteredBattles = [];
       
-      // Function to fetch battle data from API
-      async function fetchBattleData() {
-        try {
-          // Replace with your actual data fetching code
-          /* 
-          const response = await fetch('https://your-api-endpoint.com/battles');
-          const data = await response.json();
-          return data;
-          */
-          
-          // For now, return sample data
-          return sampleBattleData;
-        } catch (error) {
-          console.error('Error fetching battle data:', error);
-          return [];
+      // Отримуємо вміст кожного файлу
+      for (const file of files) {
+        if (file.name.startsWith('battles-') && file.name.endsWith('.json')) {
+          try {
+            const fileResponse = await fetch(file.download_url);
+            if (fileResponse.ok) {
+              const battleData = await fileResponse.json();
+              if (Array.isArray(battleData)) {
+                allBattles = allBattles.concat(battleData);
+              } else {
+                // Якщо це один об'єкт, додаємо його як елемент масиву
+                allBattles.push(battleData);
+              }
+            }
+          } catch (e) {
+            console.error(`Error fetching or parsing file ${file.name}:`, e);
+          }
         }
       }
       
-      // Function to delete a battle
-      async function deleteBattle(battleId) {
-        try {
-          console.log('Deleting battle:', battleId);
-          /* 
-          const response = await fetch(`https://your-api-endpoint.com/battles/${battleId}`, {
-            method: 'DELETE'
-          });
-          
-          if (response.ok) {
-            console.log('Battle deleted successfully');
-            return true;
-          } else {
-            throw new Error('Failed to delete battle');
-          }
-          */
-          
-          // For now, just return true
-          return true;
-        } catch (error) {
-          console.error('Error deleting battle:', error);
-          return false;
-        }
+      return allBattles;
+    } catch (e) {
+      console.error("Failed to fetch battle data:", e);
+      // Повертаємо приклад даних, якщо не вдалося отримати з GitHub
+      return sampleBattleData;
+    }
+  }
+  
+  // Функція для видалення бою
+  async function deleteBattle(battleId) {
+    try {
+      if (confirm('Видалити цей бій? Ця дія перенаправить вас на основну сторінку.')) {
+        window.location.href = `https://juniorapi.github.io/testwot/duplet3/index.html?deleteBattle=${battleId}`;
+        return true;
       }
+      return false;
+    } catch (e) {
+      console.error("Error deleting battle:", e);
+      return false;
+    }
+  }
+  
+  // Function to populate the battle table
+  function populateBattleTable(battles, page = 1) {
+    const tableBody = document.getElementById('battle-table-body');
+    tableBody.innerHTML = '';
+    
+    if (battles.length === 0) {
+      const emptyRow = document.createElement('tr');
+      emptyRow.innerHTML = `
+        <td colspan="8" style="text-align: center; padding: 20px;">Бої не знайдені</td>
+      `;
+      tableBody.appendChild(emptyRow);
       
-      // Function to populate the battle table
-      function populateBattleTable(battles, page = 1) {
-        const tableBody = document.getElementById('battle-table-body');
-        tableBody.innerHTML = '';
-        
-        if (battles.length === 0) {
-          const emptyRow = document.createElement('tr');
-          emptyRow.innerHTML = `
-            <td colspan="8" style="text-align: center; padding: 20px;">Бої не знайдені</td>
-          `;
-          tableBody.appendChild(emptyRow);
-          
-          // Hide pagination
-          document.getElementById('pagination').style.display = 'none';
-          return;
-        }
-        
-        // Show pagination
-        document.getElementById('pagination').style.display = 'flex';
-        
-        // Calculate pagination
-        const startIndex = (page - 1) * ITEMS_PER_PAGE;
-        const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, battles.length);
-        const paginatedBattles = battles.slice(startIndex, endIndex);
-        
-        paginatedBattles.forEach(battle => {
-          // Get primary player's stats (first player in the list)
-          const playerId = Object.keys(battle.players)[0];
-          const playerStats = battle.players[playerId];
-          
-          const row = document.createElement('tr');
-          
-          const date = new Date(battle.timestamp);
-          
-          row.innerHTML = `
-            <td>${date.toLocaleDateString()} ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
-            <td>${battle.map}</td>
-            <td>${playerStats.vehicle}</td>
-            <td class="${battle.victory ? 'victory' : 'defeat'}">${battle.victory ? 'Перемога' : 'Поразка'}</td>
-            <td class="damage">${playerStats.damage.toLocaleString()}</td>
-            <td class="frags">${playerStats.frags}</td>
-            <td>${Math.floor(battle.duration / 60)}:${(battle.duration % 60).toString().padStart(2, '0')}</td>
-            <td class="actions">
-              <button class="btn btn-view" data-id="${battle.id}">Деталі</button>
-              <button class="btn btn-delete" data-id="${battle.id}">Видалити</button>
-            </td>
-          `;
-          
-          tableBody.appendChild(row);
-        });
-        
-        // Add event listeners to buttons
-        document.querySelectorAll('.btn-view').forEach(button => {
-          button.addEventListener('click', function() {
-            const battleId = this.getAttribute('data-id');
-            showBattleDetails(battleId);
-          });
-        });
-        
-        document.querySelectorAll('.btn-delete').forEach(button => {
-          button.addEventListener('click', function() {
-            const battleId = this.getAttribute('data-id');
-            if (confirm('Ви впевнені, що хочете видалити цей бій?')) {
-              deleteBattle(battleId).then(success => {
-                if (success) {
-                  // Remove battle from the list
-                  allBattles = allBattles.filter(b => b.id !== battleId);
-                  applyFilters(); // Re-apply filters and update the table
-                  updateSummaryStats();
-                }
-              });
-            }
-          });
-        });
-        
-        // Update pagination
-        updatePagination(battles.length, page);
-      }
+      // Hide pagination
+      document.getElementById('pagination').style.display = 'none';
+      return;
+    }
+    
+    // Show pagination
+    document.getElementById('pagination').style.display = 'flex';
+    
+    // Calculate pagination
+    const startIndex = (page - 1) * ITEMS_PER_PAGE;
+    const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, battles.length);
+    const paginatedBattles = battles.slice(startIndex, endIndex);
+    
+    paginatedBattles.forEach(battle => {
+      // Get primary player's stats (first player in the list)
+      const playerId = Object.keys(battle.players)[0];
+      const playerStats = battle.players[playerId];
       
-      // Function to update pagination controls
-      function updatePagination(totalItems, currentPage) {
-        const paginationContainer = document.getElementById('pagination');
-        paginationContainer.innerHTML = '';
-        
-        const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
-        
-        if (totalPages <= 1) {
-          return;
-        }
-        
-        // Previous button
-        if (currentPage > 1) {
-          const prevButton = document.createElement('button');
-          prevButton.textContent = '←';
-          prevButton.addEventListener('click', () => {
-            goToPage(currentPage - 1);
-          });
-          paginationContainer.appendChild(prevButton);
-        }
-        
-        // Page buttons
-        const maxVisiblePages = 5;
-        let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-        
-        if (endPage - startPage + 1 < maxVisiblePages && startPage > 1) {
-          startPage = Math.max(1, endPage - maxVisiblePages + 1);
-        }
-        
-        for (let i = startPage; i <= endPage; i++) {
-          const pageButton = document.createElement('button');
-          pageButton.textContent = i;
-          if (i === currentPage) {
-            pageButton.classList.add('active');
-          }
-          
-          pageButton.addEventListener('click', () => {
-            goToPage(i);
-          });
-          
-          paginationContainer.appendChild(pageButton);
-        }
-        
-        // Next button
-        if (currentPage < totalPages) {
-          const nextButton = document.createElement('button');
-          nextButton.textContent = '→';
-          nextButton.addEventListener('click', () => {
-            goToPage(currentPage + 1);
-          });
-          paginationContainer.appendChild(nextButton);
-        }
-      }
+      const row = document.createElement('tr');
       
-      // Function to change page
-      function goToPage(page) {
-        currentPage = page;
-        populateBattleTable(filteredBattles, currentPage);
-        
-        // Scroll to top of table
-        document.querySelector('.battle-table').scrollIntoView({ behavior: 'smooth' });
-      }
+      const date = new Date(battle.timestamp);
       
-      // Function to show battle details
-      function showBattleDetails(battleId) {
-        const battle = allBattles.find(b => b.id === battleId);
-        if (!battle) return;
-        
-        const detailsContainer = document.getElementById('battle-details');
-        const detailMap = document.getElementById('detail-map');
-        const detailTime = document.getElementById('detail-time');
-        const detailResult = document.getElementById('detail-result');
-        const detailDuration = document.getElementById('detail-duration');
-        const detailPlayers = document.getElementById('detail-players');
-        
-        detailMap.textContent = battle.map;
-        detailTime.textContent = new Date(battle.timestamp).toLocaleString();
-        detailResult.textContent = battle.victory ? 'Перемога' : 'Поразка';
-        detailResult.className = battle.victory ? 'victory' : 'defeat';
-        
-        const minutes = Math.floor(battle.duration / 60);
-        const seconds = battle.duration % 60;
-        detailDuration.textContent = `Тривалість: ${minutes}:${seconds.toString().padStart(2, '0')}`;
-        
-        // Populate player performance
-        detailPlayers.innerHTML = '';
-        Object.keys(battle.players).forEach(playerId => {
-          const player = battle.players[playerId];
-          const row = document.createElement('tr');
-          
-          row.innerHTML = `
-            <td>${player.name}</td>
-            <td>${player.vehicle}</td>
-            <td class="damage">${player.damage.toLocaleString()}</td>
-            <td class="frags">${player.frags}</td>
-          `;
-          
-          detailPlayers.appendChild(row);
-        });
-        
-        detailsContainer.style.display = 'block';
-        detailsContainer.scrollIntoView({ behavior: 'smooth' });
-      }
+      row.innerHTML = `
+        <td>${date.toLocaleDateString()} ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
+        <td>${battle.map}</td>
+        <td>${playerStats.vehicle}</td>
+        <td class="${battle.victory ? 'victory' : 'defeat'}">${battle.victory ? 'Перемога' : 'Поразка'}</td>
+        <td class="damage">${playerStats.damage.toLocaleString()}</td>
+        <td class="frags">${playerStats.frags}</td>
+        <td>${Math.floor(battle.duration / 60)}:${(battle.duration % 60).toString().padStart(2, '0')}</td>
+        <td class="actions">
+          <button class="btn btn-view" data-id="${battle.id}">Деталі</button>
+          <button class="btn btn-delete" data-id="${battle.id}">Видалити</button>
+        </td>
+      `;
       
-      // Event listener for closing details
-      document.getElementById('close-details').addEventListener('click', function() {
-        document.getElementById('battle-details').style.display = 'none';
-      });
-      
-      // Function to populate filter options
-      function populateFilterOptions(battles) {
-        const mapFilter = document.getElementById('map-filter');
-        const vehicleFilter = document.getElementById('vehicle-filter');
-        const playerFilter = document.getElementById('player-filter');
-        
-        // Clear existing options except the first one
-        while (mapFilter.options.length > 1) {
-          mapFilter.remove(1);
-        }
-        
-        while (vehicleFilter.options.length > 1) {
-          vehicleFilter.remove(1);
-        }
-        
-        while (playerFilter.options.length > 1) {
-          playerFilter.remove(1);
-        }
-        
-        // Get unique maps
-        const maps = [...new Set(battles.map(battle => battle.map))];
-        maps.sort().forEach(map => {
-          const option = document.createElement('option');
-          option.value = map;
-          option.textContent = map;
-          mapFilter.appendChild(option);
-        });
-        
-        // Get unique vehicles and players
-        const vehicles = new Set();
-        const players = new Set();
-        
-        battles.forEach(battle => {
-          Object.values(battle.players).forEach(player => {
-            vehicles.add(player.vehicle);
-            players.add(player.name);
-          });
-        });
-        
-        [...vehicles].sort().forEach(vehicle => {
-          const option = document.createElement('option');
-          option.value = vehicle;
-          option.textContent = vehicle;
-          vehicleFilter.appendChild(option);
-        });
-        
-        [...players].sort().forEach(player => {
-          const option = document.createElement('option');
-          option.value = player;
-          option.textContent = player;
-          playerFilter.appendChild(option);
-        });
-      }
-      
-      // Function to apply filters
-      function applyFilters() {
-        const mapFilter = document.getElementById('map-filter').value;
-        const vehicleFilter = document.getElementById('vehicle-filter').value;
-        const resultFilter = document.getElementById('result-filter').value;
-        const dateFilter = document.getElementById('date-filter').value;
-        const playerFilter = document.getElementById('player-filter').value;
-        
-        filteredBattles = [...allBattles];
-        
-        // Apply map filter
-        if (mapFilter) {
-          filteredBattles = filteredBattles.filter(battle => battle.map === mapFilter);
-        }
-        
-        // Apply vehicle filter
-        if (vehicleFilter) {
-          filteredBattles = filteredBattles.filter(battle => {
-            return Object.values(battle.players).some(player => player.vehicle === vehicleFilter);
-          });
-        }
-        
-        // Apply result filter
-        if (resultFilter) {
-          filteredBattles = filteredBattles.filter(battle => {
-            return resultFilter === 'victory' ? battle.victory : !battle.victory;
-          });
-        }
-        
-        // Apply date filter
-        if (dateFilter) {
-          const filterDate = new Date(dateFilter);
-          filterDate.setHours(0, 0, 0, 0);
-          
-          filteredBattles = filteredBattles.filter(battle => {
-            const battleDate = new Date(battle.timestamp);
-            battleDate.setHours(0, 0, 0, 0);
-            return battleDate.getTime() === filterDate.getTime();
-          });
-        }
-        
-        // Apply player filter
-        if (playerFilter) {
-          filteredBattles = filteredBattles.filter(battle => {
-            return Object.values(battle.players).some(player => player.name === playerFilter);
-          });
-        }
-        
-        // Reset to first page and update table
-        currentPage = 1;
-        populateBattleTable(filteredBattles, currentPage);
-      }
-      
-      // Function to update summary statistics
-      function updateSummaryStats() {
-        const battles = allBattles;
-        
-        if (battles.length === 0) {
-          document.getElementById('total-battles').textContent = '0';
-          document.getElementById('total-victories').textContent = '0';
-          document.getElementById('win-rate').textContent = '0%';
-          document.getElementById('total-damage').textContent = '0';
-          document.getElementById('avg-damage').textContent = '0';
-          document.getElementById('total-frags').textContent = '0';
-          document.getElementById('avg-frags').textContent = '0';
-          document.getElementById('best-map').textContent = '-';
-          return;
-        }
-        
-        // Calculate basic stats
-        const totalBattles = battles.length;
-        const victories = battles.filter(battle => battle.victory).length;
-        const winRate = ((victories / totalBattles) * 100).toFixed(2);
-        
-        let totalDamage = 0;
-        let totalFrags = 0;
-        const mapStats = {};
-        
-        battles.forEach(battle => {
-          // Sum damage and frags from primary player in each battle
-          const primaryPlayerId = Object.keys(battle.players)[0];
-          const primaryPlayer = battle.players[primaryPlayerId];
-          
-          totalDamage += primaryPlayer.damage;
-          totalFrags += primaryPlayer.frags;
-          
-          // Track map stats
-          if (!mapStats[battle.map]) {
-            mapStats[battle.map] = {
-              battles: 0,
-              victories: 0,
-              damage: 0,
-              frags: 0
-            };
-          }
-          
-          mapStats[battle.map].battles++;
-          if (battle.victory) mapStats[battle.map].victories++;
-          mapStats[battle.map].damage += primaryPlayer.damage;
-          mapStats[battle.map].frags += primaryPlayer.frags;
-        });
-        
-        const avgDamage = Math.round(totalDamage / totalBattles);
-        const avgFrags = (totalFrags / totalBattles).toFixed(2);
-        
-        // Find best map (highest win rate with at least 3 battles)
-        let bestMap = '-';
-        let bestWinRate = 0;
-        
-        Object.entries(mapStats).forEach(([map, stats]) => {
-          if (stats.battles >= 3) {
-            const mapWinRate = stats.victories / stats.battles;
-            if (mapWinRate > bestWinRate) {
-              bestWinRate = mapWinRate;
-              bestMap = map;
-            }
-          }
-        });
-        
-        // Update UI
-        document.getElementById('total-battles').textContent = totalBattles.toString();
-        document.getElementById('total-victories').textContent = victories.toString();
-        document.getElementById('win-rate').textContent = `${winRate}%`;
-        document.getElementById('total-damage').textContent = totalDamage.toLocaleString();
-        document.getElementById('avg-damage').textContent = avgDamage.toLocaleString();
-        document.getElementById('total-frags').textContent = totalFrags.toString();
-        document.getElementById('avg-frags').textContent = avgFrags;
-        document.getElementById('best-map').textContent = bestMap;
-      }
-      
-      // Function to load battle data
-      async function loadBattleData() {
-        allBattles = await fetchBattleData();
-        
-        // Sort battles by timestamp (newest first)
-        allBattles.sort((a, b) => b.timestamp - a.timestamp);
-        
-        // Set filtered battles to all battles initially
-        filteredBattles = [...allBattles];
-        
-        // Populate table
-        populateBattleTable(filteredBattles, currentPage);
-        
-        // Populate filter options
-        populateFilterOptions(allBattles);
-        
-        // Update summary statistics
-        updateSummaryStats();
-      }
-      
-      // Add event listeners
-      document.getElementById('apply-filters').addEventListener('click', applyFilters);
-      
-      document.getElementById('clear-filters').addEventListener('click', function() {
-        document.getElementById('map-filter').value = '';
-        document.getElementById('vehicle-filter').value = '';
-        document.getElementById('result-filter').value = '';
-        document.getElementById('date-filter').value = '';
-        document.getElementById('player-filter').value = '';
-        
-        filteredBattles = [...allBattles];
-        currentPage = 1;
-        populateBattleTable(filteredBattles, currentPage);
-      });
-      
-      // Load battle data on page load
-      loadBattleData();
-      
-      // Sample battle data for testing
-      const sampleBattleData = [
-        {
-          id: '1',
-          timestamp: Date.now() - 3600000,
-          map: 'Химмельсдорф',
-          victory: true,
-          duration: 465,
-          players: {
-            '12345': {
-              name: 'Гравець1',
-              damage: 2500,
-              frags: 3,
-              vehicle: 'T-34-85'
-            },
-            '67890': {
-              name: 'Гравець2',
-              damage: 1800,
-              frags: 2,
-              vehicle: 'КВ-1С'
-            }
-          }
-        },
-        {
-          id: '2',
-          timestamp: Date.now() - 7200000,
-          map: 'Прохоровка',
-          victory: false,
-          duration: 389,
-          players: {
-            '12345': {
-              name: 'Гравець1',
-              damage: 1200,
-              frags: 1,
-              vehicle: 'T-34-85'
-            },
-            '67890': {
-              name: 'Гравець2',
-              damage: 2100,
-              frags: 2,
-              vehicle: 'КВ-1С'
-            }
-          }
-        },
-        {
-          id: '3',
-          timestamp: Date.now() - 10800000,
-          map: 'Рудники',
-          victory: true,
-          duration: 512,
-          players: {
-            '12345': {
-              name: 'Гравець1',
-              damage: 3200,
-              frags: 4,
-              vehicle: 'ИС'
-            },
-            '67890': {
-              name: 'Гравець2',
-              damage: 2400,
-              frags: 2,
-              vehicle: 'КВ-3'
-            },
-            '24680': {
-              name: 'Гравець3',
-              damage: 1800,
-              frags: 1,
-              vehicle: 'СУ-152'
-            }
-          }
-        },
-        {
-          id: '4',
-          timestamp: Date.now() - 86400000,
-          map: 'Степи',
-          victory: false,
-          duration: 420,
-          players: {
-            '12345': {
-              name: 'Гравець1',
-              damage: 1500,
-              frags: 1,
-              vehicle: 'T-34-85'
-            },
-            '67890': {
-              name: 'Гравець2',
-              damage: 1900,
-              frags: 1,
-              vehicle: 'КВ-1С'
-            }
-          }
-        },
-        {
-          id: '5',
-          timestamp: Date.now() - 172800000,
-          map: 'Малиновка',
-          victory: true,
-          duration: 540,
-          players: {
-            '12345': {
-              name: 'Гравець1',
-              damage: 2800,
-              frags: 2,
-              vehicle: 'ИС'
-            },
-            '67890': {
-              name: 'Гравець2',
-              damage: 3100,
-              frags: 3,
-              vehicle: 'КВ-3'
-            }
-          }
-        },
-        {
-          id: '6',
-          timestamp: Date.now() - 259200000,
-          map: 'Линия Зигфрида',
-          victory: false,
-          duration: 380,
-          players: {
-            '12345': {
-              name: 'Гравець1',
-              damage: 1300,
-              frags: 0,
-              vehicle: 'T-34-85'
-            },
-            '67890': {
-              name: 'Гравець2',
-              damage: 2200,
-              frags: 2,
-              vehicle: 'КВ-1С'
-            }
-          }
-        },
-        {
-          id: '7',
-          timestamp: Date.now() - 345600000,
-          map: 'Прохоровка',
-          victory: true,
-          duration: 495,
-          players: {
-            '12345': {
-              name: 'Гравець1',
-              damage: 2700,
-              frags: 3,
-              vehicle: 'T-34-85'
-            },
-            '67890': {
-              name: 'Гравець2',
-              damage: 1950,
-              frags: 1,
-              vehicle: 'КВ-1С'
-            }
-          }
-        },
-        {
-          id: '8',
-          timestamp: Date.now() - 432000000,
-          map: 'Химмельсдорф',
-          victory: true,
-          duration: 450,
-          players: {
-            '12345': {
-              name: 'Гравець1',
-              damage: 3400,
-              frags: 5,
-              vehicle: 'ИС'
-            },
-            '67890': {
-              name: 'Гравець2',
-              damage: 2200,
-              frags: 2,
-              vehicle: 'КВ-3'
-            }
-          }
-        },
-        {
-          id: '9',
-          timestamp: Date.now() - 518400000,
-          map: 'Рудники',
-          victory: false,
-          duration: 410,
-          players: {
-            '12345': {
-              name: 'Гравець1',
-              damage: 1100,
-              frags: 0,
-              vehicle: 'T-34-85'
-            },
-            '67890': {
-              name: 'Гравець2',
-              damage: 1750,
-              frags: 1,
-              vehicle: 'КВ-1С'
-            }
-          }
-        },
-        {
-          id: '10',
-          timestamp: Date.now() - 604800000,
-          map: 'Эрленберг',
-          victory: true,
-          duration: 530,
-          players: {
-            '12345': {
-              name: 'Гравець1',
-              damage: 2900,
-              frags: 2,
-              vehicle: 'ИС'
-            },
-            '67890': {
-              name: 'Гравець2',
-              damage: 2400,
-              frags: 3,
-              vehicle: 'КВ-3'
-            }
-          }
-        },
-        {
-          id: '11',
-          timestamp: Date.now() - 691200000,
-          map: 'Лайв Окс',
-          victory: false,
-          duration: 405,
-          players: {
-            '12345': {
-              name: 'Гравець1',
-              damage: 1600,
-              frags: 1,
-              vehicle: 'T-34-85'
-            },
-            '67890': {
-              name: 'Гравець2',
-              damage: 1800,
-              frags: 1,
-              vehicle: 'КВ-1С'
-            }
-          }
-        },
-        {
-          id: '12',
-          timestamp: Date.now() - 777600000,
-          map: 'Мурованка',
-          victory: true,
-          duration: 520,
-          players: {
-            '12345': {
-              name: 'Гравець1',
-              damage: 3100,
-              frags: 3,
-              vehicle: 'ИС'
-            },
-            '67890': {
-              name: 'Гравець2',
-              damage: 2650,
-              frags: 2,
-              vehicle: 'КВ-3'
-            }
-          }
-        }
-      ];
+      tableBody.appendChild(row);
     });
+    
+    // Add event listeners to buttons
+    document.querySelectorAll('.btn-view').forEach(button => {
+      button.addEventListener('click', function() {
+        const battleId = this.getAttribute('data-id');
+        showBattleDetails(battleId);
+      });
+    });
+    
+    document.querySelectorAll('.btn-delete').forEach(button => {
+      button.addEventListener('click', function() {
+        const battleId = this.getAttribute('data-id');
+        deleteBattle(battleId);
+      });
+    });
+    
+    // Update pagination
+    updatePagination(battles.length, page);
+  }
+  
+  // Function to update pagination controls
+  function updatePagination(totalItems, currentPage) {
+    const paginationContainer = document.getElementById('pagination');
+    paginationContainer.innerHTML = '';
+    
+    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+    
+    if (totalPages <= 1) {
+      return;
+    }
+    
+    // Previous button
+    if (currentPage > 1) {
+      const prevButton = document.createElement('button');
+      prevButton.textContent = '←';
+      prevButton.addEventListener('click', () => {
+        goToPage(currentPage - 1);
+      });
+      paginationContainer.appendChild(prevButton);
+    }
+    
+    // Page buttons
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage + 1 < maxVisiblePages && startPage > 1) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+      const pageButton = document.createElement('button');
+      pageButton.textContent = i;
+      if (i === currentPage) {
+        pageButton.classList.add('active');
+      }
+      
+      pageButton.addEventListener('click', () => {
+        goToPage(i);
+      });
+      
+      paginationContainer.appendChild(pageButton);
+    }
+    
+    // Next button
+    if (currentPage < totalPages) {
+      const nextButton = document.createElement('button');
+      nextButton.textContent = '→';
+      nextButton.addEventListener('click', () => {
+        goToPage(currentPage + 1);
+      });
+      paginationContainer.appendChild(nextButton);
+    }
+  }
+  
+  // Function to change page
+  function goToPage(page) {
+    currentPage = page;
+    populateBattleTable(filteredBattles, currentPage);
+    
+    // Scroll to top of table
+    document.querySelector('.battle-table').scrollIntoView({ behavior: 'smooth' });
+  }
+  
+  // Function to show battle details
+  function showBattleDetails(battleId) {
+    const battle = allBattles.find(b => b.id === battleId);
+    if (!battle) return;
+    
+    const detailsContainer = document.getElementById('battle-details');
+    const detailMap = document.getElementById('detail-map');
+    const detailTime = document.getElementById('detail-time');
+    const detailResult = document.getElementById('detail-result');
+    const detailDuration = document.getElementById('detail-duration');
+    const detailPlayers = document.getElementById('detail-players');
+    
+    detailMap.textContent = battle.map;
+    detailTime.textContent = new Date(battle.timestamp).toLocaleString();
+    detailResult.textContent = battle.victory ? 'Перемога' : 'Поразка';
+    detailResult.className = battle.victory ? 'victory' : 'defeat';
+    
+    const minutes = Math.floor(battle.duration / 60);
+    const seconds = battle.duration % 60;
+    detailDuration.textContent = `Тривалість: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    // Populate player performance
+    detailPlayers.innerHTML = '';
+    Object.keys(battle.players).forEach(playerId => {
+      const player = battle.players[playerId];
+      const row = document.createElement('tr');
+      
+      row.innerHTML = `
+        <td>${player.name}</td>
+        <td>${player.vehicle}</td>
+        <td class="damage">${player.damage.toLocaleString()}</td>
+        <td class="frags">${player.frags}</td>
+      `;
+      
+      detailPlayers.appendChild(row);
+    });
+    
+    detailsContainer.style.display = 'block';
+    detailsContainer.scrollIntoView({ behavior: 'smooth' });
+  }
+  
+  // Event listener for closing details
+  document.getElementById('close-details').addEventListener('click', function() {
+    document.getElementById('battle-details').style.display = 'none';
+  });
+  
+  // Function to populate filter options
+  function populateFilterOptions(battles) {
+    const mapFilter = document.getElementById('map-filter');
+    const vehicleFilter = document.getElementById('vehicle-filter');
+    const playerFilter = document.getElementById('player-filter');
+    
+    // Clear existing options except the first one
+    while (mapFilter.options.length > 1) {
+      mapFilter.remove(1);
+    }
+    
+    while (vehicleFilter.options.length > 1) {
+      vehicleFilter.remove(1);
+    }
+    
+    while (playerFilter.options.length > 1) {
+      playerFilter.remove(1);
+    }
+    
+    // Get unique maps
+    const maps = [...new Set(battles.map(battle => battle.map))];
+    maps.sort().forEach(map => {
+      const option = document.createElement('option');
+      option.value = map;
+      option.textContent = map;
+      mapFilter.appendChild(option);
+    });
+    
+    // Get unique vehicles and players
+    const vehicles = new Set();
+    const players = new Set();
+    
+    battles.forEach(battle => {
+      Object.values(battle.players).forEach(player => {
+        vehicles.add(player.vehicle);
+        players.add(player.name);
+      });
+    });
+    
+    [...vehicles].sort().forEach(vehicle => {
+      const option = document.createElement('option');
+      option.value = vehicle;
+      option.textContent = vehicle;
+      vehicleFilter.appendChild(option);
+    });
+    
+    [...players].sort().forEach(player => {
+      const option = document.createElement('option');
+      option.value = player;
+      option.textContent = player;
+      playerFilter.appendChild(option);
+    });
+  }
+  
+  // Function to apply filters
+  function applyFilters() {
+    const mapFilter = document.getElementById('map-filter').value;
+    const vehicleFilter = document.getElementById('vehicle-filter').value;
+    const resultFilter = document.getElementById('result-filter').value;
+    const dateFilter = document.getElementById('date-filter').value;
+    const playerFilter = document.getElementById('player-filter').value;
+    
+    filteredBattles = [...allBattles];
+    
+    // Apply map filter
+    if (mapFilter) {
+      filteredBattles = filteredBattles.filter(battle => battle.map === mapFilter);
+    }
+    
+    // Apply vehicle filter
+    if (vehicleFilter) {
+      filteredBattles = filteredBattles.filter(battle => {
+        return Object.values(battle.players).some(player => player.vehicle === vehicleFilter);
+      });
+    }
+    
+    // Apply result filter
+    if (resultFilter) {
+      filteredBattles = filteredBattles.filter(battle => {
+        return resultFilter === 'victory' ? battle.victory : !battle.victory;
+      });
+    }
+    
+    // Apply date filter
+    if (dateFilter) {
+      const filterDate = new Date(dateFilter);
+      filterDate.setHours(0, 0, 0, 0);
+      
+      filteredBattles = filteredBattles.filter(battle => {
+        const battleDate = new Date(battle.timestamp);
+        battleDate.setHours(0, 0, 0, 0);
+        return battleDate.getTime() === filterDate.getTime();
+      });
+    }
+    
+    // Apply player filter
+    if (playerFilter) {
+      filteredBattles = filteredBattles.filter(battle => {
+        return Object.values(battle.players).some(player => player.name === playerFilter);
+      });
+    }
+    
+    // Reset to first page and update table
+    currentPage = 1;
+    populateBattleTable(filteredBattles, currentPage);
+  }
+  
+  // Function to update summary statistics
+  function updateSummaryStats() {
+    const battles = allBattles;
+    
+    if (battles.length === 0) {
+      document.getElementById('total-battles').textContent = '0';
+      document.getElementById('total-victories').textContent = '0';
+      document.getElementById('win-rate').textContent = '0%';
+      document.getElementById('total-damage').textContent = '0';
+      document.getElementById('avg-damage').textContent = '0';
+      document.getElementById('total-frags').textContent = '0';
+      document.getElementById('avg-frags').textContent = '0';
+      document.getElementById('best-map').textContent = '-';
+      return;
+    }
+    
+    // Calculate basic stats
+    const totalBattles = battles.length;
+    const victories = battles.filter(battle => battle.victory).length;
+    const winRate = ((victories / totalBattles) * 100).toFixed(2);
+    
+    let totalDamage = 0;
+    let totalFrags = 0;
+    const mapStats = {};
+    
+    battles.forEach(battle => {
+      // Sum damage and frags from primary player in each battle
+      const primaryPlayerId = Object.keys(battle.players)[0];
+      const primaryPlayer = battle.players[primaryPlayerId];
+      
+      totalDamage += primaryPlayer.damage;
+      totalFrags += primaryPlayer.frags;
+      
+      // Track map stats
+      if (!mapStats[battle.map]) {
+        mapStats[battle.map] = {
+          battles: 0,
+          victories: 0,
+          damage: 0,
+          frags: 0
+        };
+      }
+      
+      mapStats[battle.map].battles++;
+      if (battle.victory) mapStats[battle.map].victories++;
+      mapStats[battle.map].damage += primaryPlayer.damage;
+      mapStats[battle.map].frags += primaryPlayer.frags;
+    });
+    
+    const avgDamage = Math.round(totalDamage / totalBattles);
+    const avgFrags = (totalFrags / totalBattles).toFixed(2);
+    
+    // Find best map (highest win rate with at least 3 battles)
+    let bestMap = '-';
+    let bestWinRate = 0;
+    
+    Object.entries(mapStats).forEach(([map, stats]) => {
+      if (stats.battles >= 3) {
+        const mapWinRate = stats.victories / stats.battles;
+        if (mapWinRate > bestWinRate) {
+          bestWinRate = mapWinRate;
+          bestMap = map;
+        }
+      }
+    });
+    
+    // Update UI
+    document.getElementById('total-battles').textContent = totalBattles.toString();
+    document.getElementById('total-victories').textContent = victories.toString();
+    document.getElementById('win-rate').textContent = `${winRate}%`;
+    document.getElementById('total-damage').textContent = totalDamage.toLocaleString();
+    document.getElementById('avg-damage').textContent = avgDamage.toLocaleString();
+    document.getElementById('total-frags').textContent = totalFrags.toString();
+    document.getElementById('avg-frags').textContent = avgFrags;
+    document.getElementById('best-map').textContent = bestMap;
+  }
+  
+  // Function to load battle data
+  async function loadBattleData() {
+    allBattles = await fetchBattleData();
+    
+    // Sort battles by timestamp (newest first)
+    allBattles.sort((a, b) => b.timestamp - a.timestamp);
+    
+    // Set filtered battles to all battles initially
+    filteredBattles = [...allBattles];
+    
+    // Populate table
+    populateBattleTable(filteredBattles, currentPage);
+    
+    // Populate filter options
+    populateFilterOptions(allBattles);
+    
+    // Update summary statistics
+    updateSummaryStats();
+  }
+  
+  // Add event listeners
+  document.getElementById('apply-filters').addEventListener('click', applyFilters);
+  
+  document.getElementById('clear-filters').addEventListener('click', function() {
+    document.getElementById('map-filter').value = '';
+    document.getElementById('vehicle-filter').value = '';
+    document.getElementById('result-filter').value = '';
+    document.getElementById('date-filter').value = '';
+    document.getElementById('player-filter').value = '';
+    
+    filteredBattles = [...allBattles];
+    currentPage = 1;
+    populateBattleTable(filteredBattles, currentPage);
+  });
+  
+  // Load battle data on page load
+  loadBattleData();
+  
+  // Sample battle data for testing in case GitHub fails
+  const sampleBattleData = [
+    {
+      id: '1',
+      timestamp: Date.now() - 3600000,
+      map: 'Химмельсдорф',
+      victory: true,
+      duration: 465,
+      players: {
+        '12345': {
+          name: 'Гравець1',
+          damage: 2500,
+          frags: 3,
+          vehicle: 'T-34-85'
+        },
+        '67890': {
+          name: 'Гравець2',
+          damage: 1800,
+          frags: 2,
+          vehicle: 'КВ-1С'
+        }
+      }
+    },
+    {
+      id: '2',
+      timestamp: Date.now() - 7200000,
+      map: 'Прохоровка',
+      victory: false,
+      duration: 389,
+      players: {
+        '12345': {
+          name: 'Гравець1',
+          damage: 1200,
+          frags: 1,
+          vehicle: 'T-34-85'
+        },
+        '67890': {
+          name: 'Гравець2',
+          damage: 2100,
+          frags: 2,
+          vehicle: 'КВ-1С'
+        }
+      }
+    },
+    // Для скорочення, інші приклади опущені
+  ];
+});
   </script>
 </body>
 </html>
