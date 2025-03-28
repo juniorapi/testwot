@@ -40,6 +40,9 @@ function initPlayer(id, name) {
       kills: 0,
       battles: 0
     };
+  } else if (name && players[id].name !== name) {
+    // Оновлюємо ім'я, якщо воно змінилося
+    players[id].name = name;
   }
   return players[id];
 }
@@ -157,23 +160,6 @@ function saveInitialBattleStats() {
   }
 }
 
-// Функція для видалення гравців, які вже не є в взводі
-function cleanupPlayers() {
-  // Отримуємо список ID гравців, які зараз є у взводі
-  const currentPlayers = new Set(platoonIds);
-  
-  // Перевіряємо кожен запис у словнику players
-  Object.keys(players).forEach(id => {
-    // Якщо гравця немає в поточному взводі, видаляємо його
-    if (!currentPlayers.has(id)) {
-      delete players[id];
-    }
-  });
-  
-  // Оновлюємо UI
-  updatePlayersUI();
-}
-
 // Отримання даних про взвод
 sdk.data.platoon.isInPlatoon.watch((isInPlatoon) => {
   // Додаємо поточного гравця до списку
@@ -185,6 +171,12 @@ sdk.data.platoon.isInPlatoon.watch((isInPlatoon) => {
   
   // Якщо не у взводі, оновлюємо UI тільки з поточним гравцем
   if (!isInPlatoon) {
+    // Видаляємо всіх інших гравців крім поточного
+    platoonIds.forEach(id => {
+      if (id !== currentPlayerId) {
+        platoonIds.delete(id);
+      }
+    });
     updatePlayersUI();
   }
 });
@@ -193,19 +185,6 @@ sdk.data.platoon.isInPlatoon.watch((isInPlatoon) => {
 sdk.data.platoon.slots.watch((slots) => {
   if (!slots || !Array.isArray(slots)) return;
   
-  // Запам'ятовуємо попередній склад взводу для порівняння
-  const previousPlatoonIds = new Set(platoonIds);
-  
-  // Очищуємо поточний список гравців взводу
-  platoonIds.clear();
-  
-  // Додаємо поточного гравця до списку
-  const currentPlayerId = sdk.data.player.id.value;
-  if (currentPlayerId) {
-    platoonIds.add(currentPlayerId);
-    initPlayer(currentPlayerId, sdk.data.player.name.value);
-  }
-  
   // Додаємо всіх гравців взводу до списку
   slots.forEach(slot => {
     if (slot && slot.dbid) {
@@ -213,25 +192,6 @@ sdk.data.platoon.slots.watch((slots) => {
       initPlayer(slot.dbid, slot.name);
     }
   });
-  
-  // Перевіряємо, чи змінився склад взводу
-  let platoonChanged = false;
-  if (previousPlatoonIds.size !== platoonIds.size) {
-    platoonChanged = true;
-  } else {
-    // Перевіряємо, чи всі ID з попереднього списку є в новому
-    for (let id of previousPlatoonIds) {
-      if (!platoonIds.has(id)) {
-        platoonChanged = true;
-        break;
-      }
-    }
-  }
-  
-  // Якщо склад взводу змінився, видаляємо гравців, яких більше немає
-  if (platoonChanged) {
-    cleanupPlayers();
-  }
   
   updatePlayersUI();
 });
@@ -274,16 +234,24 @@ sdk.data.battle.isInBattle.watch((inBattle) => {
     // Збільшуємо лічильник боїв при вході в бій
     teamStats.battles++;
     
+    // Повторне оновлення складу взводу при вході в бій
+    const slots = sdk.data.platoon.slots.value;
+    if (slots && Array.isArray(slots)) {
+      slots.forEach(slot => {
+        if (slot && slot.dbid) {
+          platoonIds.add(slot.dbid);
+          initPlayer(slot.dbid, slot.name);
+        }
+      });
+    }
+    
     saveInitialBattleStats();
     
     // Оновлюємо UI, щоб відобразити новий лічильник боїв
     updatePlayersUI();
-    
-    console.log("Бій розпочався");
   } else if (!inBattle && currentBattleStats.isActive) {
     // Гравець вийшов з бою (але результати ще не отримані)
     currentBattleStats.isActive = false;
-    console.log("Бій завершився");
   }
 });
 
@@ -321,7 +289,6 @@ sdk.data.battle.personal.damageDealt.watch((newDamage, oldDamage) => {
   if (!player) return;
   
   // Обчислюємо правильну шкоду для відображення
-  // Важливо: використовуємо новий damageDealt, який враховує всю шкоду
   if (newDamage !== undefined && newDamage > 0) {
     // Оновлюємо шкоду гравця на основі загальної шкоди з поля damageDealt
     const currentTotalDamage = initialDamage + newDamage;
@@ -450,10 +417,47 @@ sdk.data.battle.onBattleResult.watch(result => {
   updatePlayersUI();
 });
 
-// Завантаження статистики при запуску віджета
+// Додаємо кнопку оновлення для примусового оновлення
+function addRefreshButton() {
+  const container = document.querySelector('.card');
+  if (!container) return;
+  
+  const refreshButton = document.createElement('button');
+  refreshButton.textContent = "Оновити взвод";
+  refreshButton.style.marginTop = "10px";
+  refreshButton.style.padding = "5px 10px";
+  refreshButton.style.backgroundColor = "#4e54c8";
+  refreshButton.style.color = "white";
+  refreshButton.style.border = "none";
+  refreshButton.style.borderRadius = "4px";
+  refreshButton.style.cursor = "pointer";
+  
+  refreshButton.addEventListener('click', () => {
+    // Оновлюємо склад взводу при натисканні кнопки
+    const slots = sdk.data.platoon.slots.value;
+    if (slots && Array.isArray(slots)) {
+      slots.forEach(slot => {
+        if (slot && slot.dbid) {
+          platoonIds.add(slot.dbid);
+          initPlayer(slot.dbid, slot.name);
+        }
+      });
+    }
+    
+    updatePlayersUI();
+  });
+  
+  container.appendChild(refreshButton);
+}
+
+// Ініціалізація віджета
 function initializeWidget() {
+  // Додаємо кнопку оновлення
+  addRefreshButton();
+  
+  // Виконуємо початкове оновлення UI
   updatePlayersUI();
 }
 
-// Запуск віджета
-initializeWidget();
+// Запуск віджета з невеликою затримкою для гарантії завантаження даних SDK
+setTimeout(initializeWidget, 1000);
