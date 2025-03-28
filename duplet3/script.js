@@ -121,18 +121,9 @@ function updatePlayersUI() {
     playerRow.innerHTML = `
       <div class="player-name">${player.name.replace(/\s*\[.*?\]/, '')}</div>
       <div class="player-stats">
-        <div class="stat-column">
-          <div class="stat-head">Шкода</div>
-          <div class="damage">${player.damage.toLocaleString()}</div>
-        </div>
-        <div class="stat-column">
-          <div class="stat-head">Фраги</div>
-          <div class="frags">${player.kills}</div>
-        </div>
-        <div class="stat-column">
-          <div class="stat-head">Очки</div>
-          <div class="points">${playerPoints.toLocaleString()}</div>
-        </div>
+        <div class="damage">${player.damage.toLocaleString()}</div>
+        <div class="frags">${player.kills}</div>
+        <div class="points">${playerPoints.toLocaleString()}</div>
       </div>
     `;
     
@@ -634,7 +625,10 @@ function loadStats() {
 // Завантажуємо збережені дані при запуску
 loadStats();
 
-// Підготуємо дані для збереження
+// Функція для збереження даних у файл
+async function saveStatsToFile() {
+  try {
+    // Підготуємо дані для збереження
     const statsData = JSON.stringify({
       players: players,
       teamStats: teamStats,
