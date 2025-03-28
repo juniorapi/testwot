@@ -413,61 +413,46 @@ document.addEventListener('DOMContentLoaded', function() {
   let currentPage = 1;
   let filteredBattles = [];
   
-  // Функція для отримання даних боїв з GitHub
-  async function fetchBattleData() {
+  // Функція для отримання даних боїв з localStorage
+  function getLocalBattleHistory() {
     try {
-      // Отримуємо список файлів у папці data
-      const response = await fetch('https://api.github.com/repos/juniorapi/testwot/contents/data', {
-        headers: {
-          'Accept': 'application/vnd.github.v3+json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch file list: ${response.statusText}`);
+      const savedHistory = localStorage.getItem('wotBattleHistory');
+      if (savedHistory) {
+        return JSON.parse(savedHistory);
       }
-      
-      const files = await response.json();
-      let allBattles = [];
-      
-      // Отримуємо вміст кожного файлу
-      for (const file of files) {
-        if (file.name.startsWith('battles-') && file.name.endsWith('.json')) {
-          try {
-            const fileResponse = await fetch(file.download_url);
-            if (fileResponse.ok) {
-              const battleData = await fileResponse.json();
-              if (Array.isArray(battleData)) {
-                allBattles = allBattles.concat(battleData);
-              } else {
-                // Якщо це один об'єкт, додаємо його як елемент масиву
-                allBattles.push(battleData);
-              }
-            }
-          } catch (e) {
-            console.error(`Error fetching or parsing file ${file.name}:`, e);
-          }
-        }
-      }
-      
-      return allBattles;
     } catch (e) {
-      console.error("Failed to fetch battle data:", e);
-      // Повертаємо приклад даних, якщо не вдалося отримати з GitHub
-      return sampleBattleData;
+      console.error("Помилка при читанні локальної історії:", e);
     }
+    return [];
   }
   
   // Функція для видалення бою
-  async function deleteBattle(battleId) {
+  function deleteBattle(battleId) {
     try {
-      if (confirm('Видалити цей бій? Ця дія перенаправить вас на основну сторінку.')) {
-        window.location.href = `https://juniorapi.github.io/testwot/duplet3/index.html?deleteBattle=${battleId}`;
+      if (confirm('Видалити цей бій?')) {
+        // Видаляємо з локального сховища
+        const localBattles = getLocalBattleHistory();
+        const updatedBattles = localBattles.filter(battle => battle.id !== battleId);
+        
+        // Зберігаємо оновлений список
+        localStorage.setItem('wotBattleHistory', JSON.stringify(updatedBattles));
+        
+        // Оновлюємо поточний список боїв
+        allBattles = allBattles.filter(battle => battle.id !== battleId);
+        filteredBattles = filteredBattles.filter(battle => battle.id !== battleId);
+        
+        // Оновлюємо таблицю і статистику
+        populateBattleTable(filteredBattles, currentPage);
+        updateSummaryStats();
+        
+        // Показуємо повідомлення
+        alert('Бій успішно видалено з історії');
+        
         return true;
       }
       return false;
     } catch (e) {
-      console.error("Error deleting battle:", e);
+      console.error("Помилка при видаленні бою:", e);
       return false;
     }
   }
@@ -499,21 +484,26 @@ document.addEventListener('DOMContentLoaded', function() {
     
     paginatedBattles.forEach(battle => {
       // Get primary player's stats (first player in the list)
-      const playerId = Object.keys(battle.players)[0];
-      const playerStats = battle.players[playerId];
+      const playerId = battle.players ? Object.keys(battle.players)[0] : null;
+      const playerStats = playerId && battle.players ? battle.players[playerId] : null;
+      
+      if (!playerStats) {
+        console.error("Missing player stats for battle", battle);
+        return;
+      }
       
       const row = document.createElement('tr');
       
-      const date = new Date(battle.timestamp);
+      const date = new Date(battle.timestamp || Date.now());
       
       row.innerHTML = `
         <td>${date.toLocaleDateString()} ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
-        <td>${battle.map}</td>
-        <td>${playerStats.vehicle}</td>
+        <td>${battle.map || "Невідома мапа"}</td>
+        <td>${playerStats.vehicle || "Невідома техніка"}</td>
         <td class="${battle.victory ? 'victory' : 'defeat'}">${battle.victory ? 'Перемога' : 'Поразка'}</td>
-        <td class="damage">${playerStats.damage.toLocaleString()}</td>
-        <td class="frags">${playerStats.frags}</td>
-        <td>${Math.floor(battle.duration / 60)}:${(battle.duration % 60).toString().padStart(2, '0')}</td>
+        <td class="damage">${(playerStats.damage || 0).toLocaleString()}</td>
+        <td class="frags">${playerStats.frags || 0}</td>
+        <td>${Math.floor((battle.duration || 0) / 60)}:${((battle.duration || 0) % 60).toString().padStart(2, '0')}</td>
         <td class="actions">
           <button class="btn btn-view" data-id="${battle.id}">Деталі</button>
           <button class="btn btn-delete" data-id="${battle.id}">Видалити</button>
@@ -618,30 +608,35 @@ document.addEventListener('DOMContentLoaded', function() {
     const detailDuration = document.getElementById('detail-duration');
     const detailPlayers = document.getElementById('detail-players');
     
-    detailMap.textContent = battle.map;
-    detailTime.textContent = new Date(battle.timestamp).toLocaleString();
+    detailMap.textContent = battle.map || "Невідома мапа";
+    detailTime.textContent = new Date(battle.timestamp || Date.now()).toLocaleString();
     detailResult.textContent = battle.victory ? 'Перемога' : 'Поразка';
     detailResult.className = battle.victory ? 'victory' : 'defeat';
     
-    const minutes = Math.floor(battle.duration / 60);
-    const seconds = battle.duration % 60;
+    const minutes = Math.floor((battle.duration || 0) / 60);
+    const seconds = (battle.duration || 0) % 60;
     detailDuration.textContent = `Тривалість: ${minutes}:${seconds.toString().padStart(2, '0')}`;
     
     // Populate player performance
     detailPlayers.innerHTML = '';
-    Object.keys(battle.players).forEach(playerId => {
-      const player = battle.players[playerId];
-      const row = document.createElement('tr');
-      
-      row.innerHTML = `
-        <td>${player.name}</td>
-        <td>${player.vehicle}</td>
-        <td class="damage">${player.damage.toLocaleString()}</td>
-        <td class="frags">${player.frags}</td>
-      `;
-      
-      detailPlayers.appendChild(row);
-    });
+    
+    if (battle.players) {
+      Object.keys(battle.players).forEach(playerId => {
+        const player = battle.players[playerId];
+        if (!player) return;
+        
+        const row = document.createElement('tr');
+        
+        row.innerHTML = `
+          <td>${player.name || "Невідомий гравець"}</td>
+          <td>${player.vehicle || "Невідома техніка"}</td>
+          <td class="damage">${(player.damage || 0).toLocaleString()}</td>
+          <td class="frags">${player.frags || 0}</td>
+        `;
+        
+        detailPlayers.appendChild(row);
+      });
+    }
     
     detailsContainer.style.display = 'block';
     detailsContainer.scrollIntoView({ behavior: 'smooth' });
@@ -672,7 +667,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Get unique maps
-    const maps = [...new Set(battles.map(battle => battle.map))];
+    const maps = [...new Set(battles.map(battle => battle.map).filter(Boolean))];
     maps.sort().forEach(map => {
       const option = document.createElement('option');
       option.value = map;
@@ -685,9 +680,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const players = new Set();
     
     battles.forEach(battle => {
+      if (!battle.players) return;
+      
       Object.values(battle.players).forEach(player => {
-        vehicles.add(player.vehicle);
-        players.add(player.name);
+        if (player.vehicle) vehicles.add(player.vehicle);
+        if (player.name) players.add(player.name);
       });
     });
     
@@ -724,6 +721,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Apply vehicle filter
     if (vehicleFilter) {
       filteredBattles = filteredBattles.filter(battle => {
+        if (!battle.players) return false;
         return Object.values(battle.players).some(player => player.vehicle === vehicleFilter);
       });
     }
@@ -741,6 +739,7 @@ document.addEventListener('DOMContentLoaded', function() {
       filterDate.setHours(0, 0, 0, 0);
       
       filteredBattles = filteredBattles.filter(battle => {
+        if (!battle.timestamp) return false;
         const battleDate = new Date(battle.timestamp);
         battleDate.setHours(0, 0, 0, 0);
         return battleDate.getTime() === filterDate.getTime();
@@ -750,6 +749,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Apply player filter
     if (playerFilter) {
       filteredBattles = filteredBattles.filter(battle => {
+        if (!battle.players) return false;
         return Object.values(battle.players).some(player => player.name === playerFilter);
       });
     }
@@ -785,14 +785,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const mapStats = {};
     
     battles.forEach(battle => {
+      if (!battle.players || Object.keys(battle.players).length === 0) return;
+      
       // Sum damage and frags from primary player in each battle
       const primaryPlayerId = Object.keys(battle.players)[0];
       const primaryPlayer = battle.players[primaryPlayerId];
       
-      totalDamage += primaryPlayer.damage;
-      totalFrags += primaryPlayer.frags;
+      if (!primaryPlayer) return;
+      
+      totalDamage += primaryPlayer.damage || 0;
+      totalFrags += primaryPlayer.frags || 0;
       
       // Track map stats
+      if (!battle.map) return;
+      
       if (!mapStats[battle.map]) {
         mapStats[battle.map] = {
           battles: 0,
@@ -804,8 +810,8 @@ document.addEventListener('DOMContentLoaded', function() {
       
       mapStats[battle.map].battles++;
       if (battle.victory) mapStats[battle.map].victories++;
-      mapStats[battle.map].damage += primaryPlayer.damage;
-      mapStats[battle.map].frags += primaryPlayer.frags;
+      mapStats[battle.map].damage += primaryPlayer.damage || 0;
+      mapStats[battle.map].frags += primaryPlayer.frags || 0;
     });
     
     const avgDamage = Math.round(totalDamage / totalBattles);
@@ -836,27 +842,129 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('best-map').textContent = bestMap;
   }
   
-  // Function to load battle data
-  async function loadBattleData() {
-    allBattles = await fetchBattleData();
+  // Функція для експорту даних
+  function exportBattleData() {
+    try {
+      const dataStr = JSON.stringify(allBattles, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+      
+      const exportFileDefaultName = `wot-battle-history-${new Date().toISOString().split('T')[0]}.json`;
+      
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+      
+      return true;
+    } catch (e) {
+      console.error("Помилка при експорті даних:", e);
+      return false;
+    }
+  }
+  
+  // Функція для імпорту даних
+  function importBattleData() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
     
-    // Sort battles by timestamp (newest first)
-    allBattles.sort((a, b) => b.timestamp - a.timestamp);
+    input.onchange = function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          
+          if (Array.isArray(importedData)) {
+            // Об'єднуємо з існуючими даними
+            const existingData = getLocalBattleHistory();
+            
+            // Створюємо мапу для уникнення дублікатів
+            const battlesMap = new Map();
+            
+            // Додаємо існуючі дані
+            existingData.forEach(battle => {
+              if (battle.id) battlesMap.set(battle.id, battle);
+            });
+            
+            // Додаємо імпортовані дані
+            importedData.forEach(battle => {
+              if (battle.id) battlesMap.set(battle.id, battle);
+            });
+            
+            // Перетворюємо мапу назад у масив
+            const mergedBattles = Array.from(battlesMap.values());
+            
+            // Зберігаємо в localStorage
+            localStorage.setItem('wotBattleHistory', JSON.stringify(mergedBattles));
+            
+            // Перезавантажуємо сторінку для відображення нових даних
+            alert(`Імпортовано ${importedData.length} записів.`);
+            window.location.reload();
+          } else {
+            alert("Неправильний формат файлу. Очікується масив битв.");
+          }
+        } catch (e) {
+          console.error("Помилка при імпорті даних:", e);
+          alert("Помилка при імпорті даних: " + e.message);
+        }
+      };
+      
+      reader.readAsText(file);
+    };
     
-    // Set filtered battles to all battles initially
+    input.click();
+  }
+  
+  // Додавання кнопок експорту та імпорту
+  function addExportImportButtons() {
+    const container = document.querySelector('.filters');
+    if (!container) return;
+    
+    const buttonGroup = document.createElement('div');
+    buttonGroup.className = 'button-group';
+    buttonGroup.style.marginLeft = 'auto';
+    
+    const exportBtn = document.createElement('button');
+    exportBtn.textContent = 'Експорт даних';
+    exportBtn.addEventListener('click', exportBattleData);
+    
+    const importBtn = document.createElement('button');
+    importBtn.textContent = 'Імпорт даних';
+    importBtn.addEventListener('click', importBattleData);
+    
+    buttonGroup.appendChild(exportBtn);
+    buttonGroup.appendChild(importBtn);
+    
+    container.appendChild(buttonGroup);
+  }
+  
+  // Завантаження даних боїв
+  function loadBattleData() {
+    // Отримуємо дані з localStorage
+    allBattles = getLocalBattleHistory();
+    
+    console.log(`Завантажено ${allBattles.length} боїв з localStorage`);
+    
+    // Сортуємо за часом (найновіші першими)
+    allBattles.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    
+    // Встановлюємо початкові відфільтровані бої
     filteredBattles = [...allBattles];
     
-    // Populate table
+    // Відображаємо таблицю
     populateBattleTable(filteredBattles, currentPage);
     
-    // Populate filter options
+    // Заповнюємо опції фільтрів
     populateFilterOptions(allBattles);
     
-    // Update summary statistics
+    // Оновлюємо загальну статистику
     updateSummaryStats();
   }
   
-  // Add event listeners
+  // Додаємо слухачі подій
   document.getElementById('apply-filters').addEventListener('click', applyFilters);
   
   document.getElementById('clear-filters').addEventListener('click', function() {
@@ -871,55 +979,11 @@ document.addEventListener('DOMContentLoaded', function() {
     populateBattleTable(filteredBattles, currentPage);
   });
   
-  // Load battle data on page load
-  loadBattleData();
+  // Додаємо кнопки експорту та імпорту
+  addExportImportButtons();
   
-  // Sample battle data for testing in case GitHub fails
-  const sampleBattleData = [
-    {
-      id: '1',
-      timestamp: Date.now() - 3600000,
-      map: 'Химмельсдорф',
-      victory: true,
-      duration: 465,
-      players: {
-        '12345': {
-          name: 'Гравець1',
-          damage: 2500,
-          frags: 3,
-          vehicle: 'T-34-85'
-        },
-        '67890': {
-          name: 'Гравець2',
-          damage: 1800,
-          frags: 2,
-          vehicle: 'КВ-1С'
-        }
-      }
-    },
-    {
-      id: '2',
-      timestamp: Date.now() - 7200000,
-      map: 'Прохоровка',
-      victory: false,
-      duration: 389,
-      players: {
-        '12345': {
-          name: 'Гравець1',
-          damage: 1200,
-          frags: 1,
-          vehicle: 'T-34-85'
-        },
-        '67890': {
-          name: 'Гравець2',
-          damage: 2100,
-          frags: 2,
-          vehicle: 'КВ-1С'
-        }
-      }
-    },
-    // Для скорочення, інші приклади опущені
-  ];
+  // Завантажуємо дані при завантаженні сторінки
+  loadBattleData();
 });
   </script>
 </body>
