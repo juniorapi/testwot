@@ -336,6 +336,212 @@ sdk.data.battle.onPlayerFeedback.watch(feedback => {
   }
 });
 
+// Функція для створення запису бою для історії
+function createBattleRecord(result, isVictory) {
+  const currentPlayerId = sdk.data.player.id.value;
+  if (!currentPlayerId) return null;
+  
+  // Створюємо базовий об'єкт бою
+  const battleData = {
+    id: Date.now().toString(),
+    timestamp: Date.now(),
+    map: currentBattleStats.map || "Невідома мапа",
+    victory: isVictory,
+    duration: Math.floor((Date.now() - currentBattleStats.startTime) / 1000) || 0,
+    players: {}
+  };
+  
+  // Додаємо інформацію про всіх гравців взводу
+  Array.from(platoonIds).forEach(playerId => {
+    if (!result.players[playerId]) return;
+    
+    const playerData = players[playerId];
+    if (!playerData) return;
+    
+    let vehicleName = "Невідома техніка";
+    let damageDealt = 0;
+    let frags = 0;
+    
+    // Шукаємо техніку гравця і отримуємо статистику
+    for (const vehicleId in result.vehicles) {
+      const vehicles = result.vehicles[vehicleId];
+      
+      for (const vehicle of vehicles) {
+        if (vehicle.accountDBID === playerId) {
+          vehicleName = vehicle.vehicleName || vehicleName;
+          damageDealt = vehicle.damageDealt || 0;
+          frags = vehicle.kills || 0;
+          break;
+        }
+      }
+    }
+    
+    // Для поточного гравця використовуємо відстежену шкоду
+    if (playerId === currentPlayerId) {
+      const initialDamage = currentBattleStats.playersInitialDamage[playerId] || 0;
+      const finalDamage = playerData.damage;
+      
+      // Рахуємо шкоду, нанесену протягом цього бою
+      const battleDamage = finalDamage - initialDamage;
+      
+      // Використовуємо більше значення: відстежене або з результатів
+      damageDealt = Math.max(damageDealt, battleDamage);
+      
+      // Для фрагів також беремо максимальне значення
+      frags = Math.max(frags, currentBattleStats.fragsThisBattle[playerId] || 0);
+    }
+    
+    // Додаємо гравця до запису бою
+    battleData.players[playerId] = {
+      name: playerData.name,
+      damage: damageDealt,
+      frags: frags,
+      vehicle: vehicleName
+    };
+  });
+  
+  return battleData;
+}
+
+// Функція для збереження даних бою в історію
+function saveBattleToHistory(battleData) {
+  // Зберігаємо дані в localStorage для наступного відкриття сторінки історії
+  try {
+    // Отримуємо існуючу історію або створюємо нову
+    let battleHistory = [];
+    const savedHistory = localStorage.getItem('wotBattleHistory');
+    
+    if (savedHistory) {
+      battleHistory = JSON.parse(savedHistory);
+    }
+    
+    // Додаємо новий бій
+    battleHistory.push(battleData);
+    
+    // Зберігаємо не більше 100 останніх боїв
+    if (battleHistory.length > 100) {
+      battleHistory = battleHistory.slice(-100);
+    }
+    
+    // Зберігаємо в localStorage
+    localStorage.setItem('wotBattleHistory', JSON.stringify(battleHistory));
+    console.log("Бій збережено в історію", battleData);
+    
+    // Додаємо повідомлення про збереження
+    showSaveNotification();
+    
+    // Намагаємося відправити дані через GitHub Issue (для постійного зберігання)
+    sendBattleDataToGitHub(battleData);
+    
+    return true;
+  } catch (e) {
+    console.error("Помилка при збереженні історії:", e);
+    return false;
+  }
+}
+
+// Функція для створення повідомлення про збереження бою
+function showSaveNotification() {
+  const notification = document.createElement('div');
+  notification.style.position = 'fixed';
+  notification.style.bottom = '20px';
+  notification.style.right = '20px';
+  notification.style.backgroundColor = 'rgba(46, 204, 113, 0.9)';
+  notification.style.color = 'white';
+  notification.style.padding = '10px 15px';
+  notification.style.borderRadius = '4px';
+  notification.style.fontWeight = '500';
+  notification.style.zIndex = '9999';
+  notification.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)';
+  notification.textContent = 'Бій збережено в історію';
+  
+  document.body.appendChild(notification);
+  
+  // Видаляємо повідомлення через 3 секунди
+  setTimeout(() => {
+    document.body.removeChild(notification);
+  }, 3000);
+}
+
+// Функція для збереження даних бою через GitHub Issue
+function sendBattleDataToGitHub(battleData) {
+  try {
+    // Створюємо заголовок та тіло issue
+    const issueTitle = `Add battle data for ${new Date().toISOString().split('T')[0]}`;
+    const issueBody = JSON.stringify(battleData, null, 2);
+    
+    // Створюємо URL для створення issue
+    const issueUrl = `https://github.com/juniorapi/testwot/issues/new?title=${encodeURIComponent(issueTitle)}&body=${encodeURIComponent(issueBody)}&labels=battle-data`;
+    
+    // Відкриваємо нове вікно для створення issue
+    const newWindow = window.open(issueUrl, '_blank');
+    
+    // Якщо вікно не відкрилося, спробуємо створити невидимий iframe
+    if (!newWindow) {
+      console.log("Не вдалося відкрити вікно, спробуємо інший метод");
+      
+      // Створюємо форму для відправки
+      const form = document.createElement('form');
+      form.method = 'post';
+      form.action = 'https://github.com/juniorapi/testwot/issues/new';
+      form.target = '_blank';
+      form.style.display = 'none';
+      
+      // Додаємо поля форми
+      const createField = (name, value) => {
+        const field = document.createElement('input');
+        field.type = 'hidden';
+        field.name = name;
+        field.value = value;
+        form.appendChild(field);
+      };
+      
+      createField('title', issueTitle);
+      createField('body', issueBody);
+      createField('labels', 'battle-data');
+      
+      // Додаємо форму на сторінку і відправляємо
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+    }
+    
+    console.log('Дані бою відправлено на GitHub');
+    return true;
+  } catch (e) {
+    console.error("Помилка при відправці даних на GitHub:", e);
+    return false;
+  }
+}
+
+// Додаємо кнопку для перегляду історії
+function addHistoryButton() {
+  const card = document.querySelector('.card');
+  if (!card) return;
+  
+  const buttonContainer = document.createElement('div');
+  buttonContainer.style.textAlign = 'center';
+  buttonContainer.style.marginTop = '10px';
+  
+  const historyButton = document.createElement('button');
+  historyButton.textContent = "Переглянути історію";
+  historyButton.style.padding = '8px 16px';
+  historyButton.style.backgroundColor = '#4e54c8';
+  historyButton.style.color = 'white';
+  historyButton.style.border = 'none';
+  historyButton.style.borderRadius = '4px';
+  historyButton.style.cursor = 'pointer';
+  historyButton.style.fontSize = '14px';
+  historyButton.style.fontWeight = '500';
+  
+  historyButton.addEventListener('click', () => {
+    window.open('./battle-history.html', '_blank');
+  });
+  
+  buttonContainer.appendChild(historyButton);
+  card.appendChild(buttonContainer);
+}
+
 // Обробка результатів бою
 sdk.data.battle.onBattleResult.watch(result => {
   if (!result || !result.vehicles || !result.players) {
@@ -414,13 +620,63 @@ sdk.data.battle.onBattleResult.watch(result => {
     }
   });
   
+  // Створюємо і зберігаємо запис бою в історію
+  const battleRecord = createBattleRecord(result, isVictory);
+  if (battleRecord) {
+    saveBattleToHistory(battleRecord);
+  }
+  
   updatePlayersUI();
 });
 
+// Додаємо кнопку оновлення для примусового оновлення взводу
+function addRefreshButton() {
+  const container = document.querySelector('.card');
+  if (!container) return;
+  
+  const refreshButton = document.createElement('button');
+  refreshButton.textContent = "Оновити взвод";
+  refreshButton.style.marginTop = "10px";
+  refreshButton.style.padding = "5px 10px";
+  refreshButton.style.backgroundColor = "#4e54c8";
+  refreshButton.style.color = "white";
+  refreshButton.style.border = "none";
+  refreshButton.style.borderRadius = "4px";
+  refreshButton.style.cursor = "pointer";
+  refreshButton.style.marginRight = "10px";
+  
+  refreshButton.addEventListener('click', () => {
+    // Оновлюємо склад взводу при натисканні кнопки
+    const slots = sdk.data.platoon.slots.value;
+    if (slots && Array.isArray(slots)) {
+      slots.forEach(slot => {
+        if (slot && slot.dbid) {
+          platoonIds.add(slot.dbid);
+          initPlayer(slot.dbid, slot.name);
+        }
+      });
+    }
+    
+    updatePlayersUI();
+  });
+  
+  // Створюємо контейнер для кнопок
+  const buttonContainer = document.createElement('div');
+  buttonContainer.style.display = "flex";
+  buttonContainer.style.justifyContent = "center";
+  buttonContainer.style.gap = "10px";
+  
+  buttonContainer.appendChild(refreshButton);
+  container.appendChild(buttonContainer);
+}
+
 // Ініціалізація віджета
 function initializeWidget() {
-  // Додаємо кнопку оновлення
+  // Додаємо кнопку оновлення взводу
   addRefreshButton();
+  
+  // Додаємо кнопку перегляду історії
+  addHistoryButton();
   
   // Виконуємо початкове оновлення UI
   updatePlayersUI();
