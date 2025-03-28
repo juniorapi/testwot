@@ -5,6 +5,10 @@ body {
   background-color: transparent;
   margin: 0;
   padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh; /* Центрування по вертикалі */
 }
 
 .card {
@@ -13,7 +17,7 @@ body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   padding: 15px;
   width: 280px;
-  margin: 0 auto;
+  margin: 20px; /* Додав відступ від країв екрану */
   position: relative;
   overflow: hidden;
   backdrop-filter: blur(5px);
@@ -80,6 +84,8 @@ body {
 .player-name {
   color: #fff;
   font-weight: 500;
+
+  margin-top: 5px; /* Додав невеликий відступ зверху */
 }
 
 .player-stats {
