@@ -476,34 +476,11 @@ function sendBattleDataToGitHub(battleData) {
     // Відкриваємо нове вікно для створення issue
     const newWindow = window.open(issueUrl, '_blank');
     
-    // Якщо вікно не відкрилося, спробуємо створити невидимий iframe
+    // Якщо вікно не відкрилося, показуємо повідомлення
     if (!newWindow) {
-      console.log("Не вдалося відкрити вікно, спробуємо інший метод");
-      
-      // Створюємо форму для відправки
-      const form = document.createElement('form');
-      form.method = 'post';
-      form.action = 'https://github.com/juniorapi/testwot/issues/new';
-      form.target = '_blank';
-      form.style.display = 'none';
-      
-      // Додаємо поля форми
-      const createField = (name, value) => {
-        const field = document.createElement('input');
-        field.type = 'hidden';
-        field.name = name;
-        field.value = value;
-        form.appendChild(field);
-      };
-      
-      createField('title', issueTitle);
-      createField('body', issueBody);
-      createField('labels', 'battle-data');
-      
-      // Додаємо форму на сторінку і відправляємо
-      document.body.appendChild(form);
-      form.submit();
-      document.body.removeChild(form);
+      console.log("Не вдалося відкрити вікно для GitHub Issue");
+      alert("Клацніть 'OK', щоб перейти на GitHub і зберегти результати бою. Це допоможе зберегти вашу статистику назавжди.");
+      window.open(issueUrl, '_blank');
     }
     
     console.log('Дані бою відправлено на GitHub');
