@@ -1,0 +1,96 @@
+name: Handle Battle Data
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  process-battle-data:
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.labels.*.name, 'battle-data') || contains(github.event.issue.labels.*.name, 'delete-battle')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+          
+      - name: Process Issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_LABELS: ${{ join(github.event.issue.labels.*.name, ',') }}
+        run: |
+          if [[ "$ISSUE_LABELS" == *"battle-data"* ]]; then
+            # Extract date from issue title
+            DATE=$(echo "$ISSUE_TITLE" | grep -oP 'Add battle data for \K[0-9-]+')
+            
+            # Create file path
+            FILE_PATH="data/battles-${DATE}.json"
+            
+            # Check if file exists
+            if [ -f "$FILE_PATH" ]; then
+              # Read existing data
+              EXISTING_DATA=$(cat "$FILE_PATH")
+              # Parse as JSON array
+              if [[ $EXISTING_DATA == \[* ]]; then
+                # Remove closing bracket, add comma and new battle data, add closing bracket
+                echo "${EXISTING_DATA%]}, $ISSUE_BODY]" > "$FILE_PATH"
+              else
+                # Create new array with the existing data and new battle data
+                echo "[$EXISTING_DATA, $ISSUE_BODY]" > "$FILE_PATH"
+              fi
+            else
+              # Create new file with battle data in array
+              echo "[$ISSUE_BODY]" > "$FILE_PATH"
+            fi
+            
+            # Commit and push changes
+            git config --global user.name 'GitHub Action'
+            git config --global user.email 'action@github.com'
+            git add "$FILE_PATH"
+            git commit -m "Add battle data for $DATE via issue #$ISSUE_NUMBER"
+            git push
+            
+            # Close the issue
+            curl -X PATCH \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUMBER \
+              -d '{"state":"closed"}'
+              
+          elif [[ "$ISSUE_LABELS" == *"delete-battle"* ]]; then
+            # Extract battle ID from issue body
+            BATTLE_ID=$(echo "$ISSUE_BODY" | grep -oP 'ID: \K[0-9]+')
+            
+            # Search for the battle in all data files
+            for file in data/battles-*.json; do
+              if [ -f "$file" ]; then
+                # Check if file contains the battle ID
+                if grep -q "$BATTLE_ID" "$file"; then
+                  # Create a temporary file without the battle
+                  cat "$file" | jq "map(select(.id != \"$BATTLE_ID\"))" > temp.json
+                  mv temp.json "$file"
+                  
+                  # Commit and push changes
+                  git config --global user.name 'GitHub Action'
+                  git config --global user.email 'action@github.com'
+                  git add "$file"
+                  git commit -m "Delete battle $BATTLE_ID via issue #$ISSUE_NUMBER"
+                  git push
+                  
+                  # Close the issue
+                  curl -X PATCH \
+                    -H "Authorization: token $GITHUB_TOKEN" \
+                    -H "Accept: application/vnd.github.v3+json" \
+                    https://api.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUMBER \
+                    -d '{"state":"closed"}'
+                  break
+                fi
+              fi
+            done
+          fi
