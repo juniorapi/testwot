@@ -2,197 +2,37 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
-  <title>Статистика бою</title>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
-    
-    body {
-      font-family: 'Roboto', sans-serif;
-      background-color: transparent;
-      margin: 0;
-      padding: 0;
-      color: #fff;
-    }
-    
-    .stats-card {
-      background-color: rgba(30, 30, 30, 0.85);
-      width: 280px;
-      margin: 20px auto;
-      position: relative;
-      padding: 15px;
-      border: 1px solid rgba(80, 80, 80, 0.3);
-    }
-    
-    .header {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 12px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid rgba(80, 80, 80, 0.3);
-    }
-    
-    .title {
-      font-size: 16px;
-      font-weight: 700;
-      color: #fff;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    
-    .battle-count {
-      font-size: 14px;
-      color: #aaa;
-    }
-    
-    .player-list {
-      margin-bottom: 12px;
-    }
-    
-    .player-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 8px;
-      margin-bottom: 6px;
-      background-color: rgba(20, 20, 20, 0.4);
-    }
-    
-    .player-name {
-      color: #fff;
-      font-weight: 500;
-    }
-    
-    .player-stats {
-      display: flex;
-      gap: 12px;
-    }
-    
-    .stat-column {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    
-    .stat-label {
-      font-size: 10px;
-      color: #aaa;
-      margin-bottom: 3px;
-    }
-    
-    .damage {
-      color: #ff9c00;
-      font-weight: 500;
-    }
-    
-    .frags {
-      color: #4ee100;
-      font-weight: 500;
-    }
-    
-    .points {
-      color: #fff;
-      font-weight: 700;
-    }
-    
-    .team-stats {
-      background-color: rgba(20, 20, 20, 0.4);
-      padding: 10px;
-      margin-bottom: 12px;
-    }
-    
-    .stat-row {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 6px;
-      font-size: 14px;
-    }
-    
-    .stat-name {
-      color: #aaa;
-    }
-    
-    .stat-value {
-      color: #fff;
-      font-weight: 500;
-    }
-    
-    .total-points {
-      display: flex;
-      justify-content: space-between;
-      padding: 10px;
-      background-color: rgba(20, 20, 20, 0.6);
-      font-size: 16px;
-      font-weight: 700;
-    }
-    
-    .total-label {
-      color: #aaa;
-      text-transform: uppercase;
-    }
-    
-    .total-value {
-      color: #4ee100;
-    }
-  </style>
+  <title>Статистика</title>
+  <script src="https://unpkg.com/wotstat-widgets-sdk@1.2.0/dist/wotstat-widgets-sdk.umd.js"></script>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="stats-card">
+  <div class="card">
     <div class="header">
       <div class="title">Статистика</div>
-      <div class="battle-count">Бої: <span id="battles-count">12/17</span></div>
+      <div class="battle-count">Бої: <span id="battles-count">0/0</span></div>
     </div>
     
-    <div class="player-list">
-      <div class="player-row">
-        <div class="player-name">Гравець1</div>
-        <div class="player-stats">
-          <div class="stat-column">
-            <div class="stat-label">ШКОДА</div>
-            <div class="damage">2500</div>
-          </div>
-          <div class="stat-column">
-            <div class="stat-label">ФРАГИ</div>
-            <div class="frags">3</div>
-          </div>
-          <div class="stat-column">
-            <div class="stat-label">ОЧКИ</div>
-            <div class="points">3700</div>
-          </div>
-        </div>
-      </div>
-      <div class="player-row">
-        <div class="player-name">Гравець2</div>
-        <div class="player-stats">
-          <div class="stat-column">
-            <div class="stat-label">ШКОДА</div>
-            <div class="damage">1800</div>
-          </div>
-          <div class="stat-column">
-            <div class="stat-label">ФРАГИ</div>
-            <div class="frags">2</div>
-          </div>
-          <div class="stat-column">
-            <div class="stat-label">ОЧКИ</div>
-            <div class="points">2600</div>
-          </div>
-        </div>
-      </div>
+    <div class="player-list" id="player-container">
+      <!-- Player rows will be added here -->
     </div>
 
     <div class="team-stats">
       <div class="stat-row">
-        <div class="stat-name">Загальна шкода:</div>
-        <div class="stat-value damage">4300</div>
+        <div class="stat-label">Загальна шкода:</div>
+        <div class="stat-value damage" id="team-damage">0</div>
       </div>
       <div class="stat-row">
-        <div class="stat-name">Всього фрагів:</div>
-        <div class="stat-value frags">5</div>
+        <div class="stat-label">Всього фрагів:</div>
+        <div class="stat-value frags" id="team-frags">0</div>
       </div>
     </div>
     
     <div class="total-points">
       <div class="total-label">Всього очок</div>
-      <div class="total-value">18300</div>
+      <div class="total-value" id="team-points">0</div>
     </div>
   </div>
+<script src="script.js"></script>
 </body>
 </html>
