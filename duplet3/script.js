@@ -417,39 +417,6 @@ sdk.data.battle.onBattleResult.watch(result => {
   updatePlayersUI();
 });
 
-// Додаємо кнопку оновлення для примусового оновлення
-function addRefreshButton() {
-  const container = document.querySelector('.card');
-  if (!container) return;
-  
-  const refreshButton = document.createElement('button');
-  refreshButton.textContent = "Оновити взвод";
-  refreshButton.style.marginTop = "10px";
-  refreshButton.style.padding = "5px 10px";
-  refreshButton.style.backgroundColor = "#4e54c8";
-  refreshButton.style.color = "white";
-  refreshButton.style.border = "none";
-  refreshButton.style.borderRadius = "4px";
-  refreshButton.style.cursor = "pointer";
-  
-  refreshButton.addEventListener('click', () => {
-    // Оновлюємо склад взводу при натисканні кнопки
-    const slots = sdk.data.platoon.slots.value;
-    if (slots && Array.isArray(slots)) {
-      slots.forEach(slot => {
-        if (slot && slot.dbid) {
-          platoonIds.add(slot.dbid);
-          initPlayer(slot.dbid, slot.name);
-        }
-      });
-    }
-    
-    updatePlayersUI();
-  });
-  
-  container.appendChild(refreshButton);
-}
-
 // Ініціалізація віджета
 function initializeWidget() {
   // Додаємо кнопку оновлення
