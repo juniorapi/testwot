@@ -22,13 +22,51 @@ const currentBattleStats = {
   fragsThisBattle: {},
   map: "",
   startTime: null,
-  vehicles: {}
+  vehicles: {},
+  resultProcessed: false // Додана перевірка обробки результатів
 };
 
 // Константи
 const POINTS_PER_DAMAGE = 1;
 const POINTS_PER_FRAG = 400;
 const POINTS_PER_TEAM_WIN = 1000;
+
+// Завантажуємо дані з localStorage при старті
+function loadStatsFromLocalStorage() {
+  try {
+    const savedStats = localStorage.getItem('wotPlatoonStats');
+    if (savedStats) {
+      const data = JSON.parse(savedStats);
+      
+      if (data.players) {
+        Object.assign(players, data.players);
+      }
+      
+      if (data.teamStats) {
+        Object.assign(teamStats, data.teamStats);
+      }
+      
+      if (data.platoonIds) {
+        data.platoonIds.forEach(id => platoonIds.add(id));
+      }
+    }
+  } catch (e) {
+    console.error("Помилка при завантаженні даних:", e);
+  }
+}
+
+// Зберігаємо дані в localStorage
+function saveStatsToLocalStorage() {
+  try {
+    localStorage.setItem('wotPlatoonStats', JSON.stringify({
+      players: players,
+      teamStats: teamStats,
+      platoonIds: Array.from(platoonIds)
+    }));
+  } catch (e) {
+    console.error("Помилка при збереженні даних:", e);
+  }
+}
 
 // Ініціалізація даних гравця
 function initPlayer(id, name) {
@@ -93,6 +131,9 @@ function updateTeamStats() {
   document.getElementById('battles-count').textContent = 
     `${teamStats.victories}/${teamStats.battles}`;
   document.getElementById('team-points').textContent = teamStats.points.toLocaleString();
+  
+  // Зберігаємо оновлені дані
+  saveStatsToLocalStorage();
 }
 
 // Оновлення UI гравців
@@ -144,6 +185,7 @@ function saveInitialBattleStats() {
   currentBattleStats.fragsThisBattle = {};
   currentBattleStats.vehicles = {};
   currentBattleStats.startTime = Date.now();
+  currentBattleStats.resultProcessed = false;
   
   Array.from(platoonIds).forEach(id => {
     const player = players[id];
@@ -155,7 +197,9 @@ function saveInitialBattleStats() {
   });
   
   // Зберігаємо інформацію про мапу
-  if (sdk.data.battle.mapName && sdk.data.battle.mapName.value) {
+  if (sdk.data.battle.arena && sdk.data.battle.arena.value) {
+    currentBattleStats.map = sdk.data.battle.arena.value.localizedName;
+  } else if (sdk.data.battle.mapName && sdk.data.battle.mapName.value) {
     currentBattleStats.map = sdk.data.battle.mapName.value;
   }
 }
@@ -206,19 +250,28 @@ sdk.data.player.name.watch((name) => {
 });
 
 // Відстеження техніки гравця
-sdk.data.battle.vehicle.name.watch((vehicleName) => {
-  if (!currentBattleStats.isActive || !vehicleName) return;
+sdk.data.battle.vehicle.watch((vehicleData) => {
+  if (!currentBattleStats.isActive || !vehicleData) return;
   
   const currentPlayerId = sdk.data.player.id.value;
   if (currentPlayerId) {
     if (!currentBattleStats.vehicles[currentPlayerId]) {
       currentBattleStats.vehicles[currentPlayerId] = {};
     }
-    currentBattleStats.vehicles[currentPlayerId].name = vehicleName;
+    currentBattleStats.vehicles[currentPlayerId].name = vehicleData.localizedName;
+    currentBattleStats.vehicles[currentPlayerId].level = vehicleData.level;
+    currentBattleStats.vehicles[currentPlayerId].class = vehicleData.class;
   }
 });
 
 // Відстеження назви мапи
+sdk.data.battle.arena.watch((arenaData) => {
+  if (currentBattleStats.isActive && arenaData) {
+    currentBattleStats.map = arenaData.localizedName;
+  }
+});
+
+// Альтернативне відстеження назви мапи
 sdk.data.battle.mapName.watch((mapName) => {
   if (currentBattleStats.isActive && mapName) {
     currentBattleStats.map = mapName;
@@ -274,7 +327,7 @@ sdk.data.battle.efficiency.damage.watch((newDamage, oldDamage) => {
   }
 });
 
-// ВИПРАВЛЕННЯ: Відстеження загальної шкоди (включно з блайндшотом)
+// Відстеження загальної шкоди (включно з блайндшотом)
 sdk.data.battle.personal.damageDealt.watch((newDamage, oldDamage) => {
   if (!currentBattleStats.isActive) return;
   
@@ -299,6 +352,32 @@ sdk.data.battle.personal.damageDealt.watch((newDamage, oldDamage) => {
       
       // Оновлюємо UI
       updatePlayersUI();
+    }
+  }
+});
+
+// Відстеження фрагів через аналіз шкоди (більш надійний метод)
+sdk.data.battle.onDamage.watch(dmg => {
+  if (!currentBattleStats.isActive || !dmg) return;
+  
+  // Якщо це смертельна шкода (health ≤ 0) і атакуючий танк належить гравцю з нашого взводу
+  if (dmg.health <= 0 && dmg.attacker) {
+    const platoon = sdk.data.platoon.slots.value?.map(t => t?.name).filter(t => t) || [];
+    
+    // Якщо атакуючий у нашому взводі
+    if (platoon.includes(dmg.attacker.playerName)) {
+      // Знаходимо ID гравця за ім'ям
+      let attackerId = null;
+      for (const id of platoonIds) {
+        if (players[id] && players[id].name === dmg.attacker.playerName) {
+          attackerId = id;
+          break;
+        }
+      }
+      
+      if (attackerId) {
+        updatePlayerKill(attackerId, dmg.attacker.playerName);
+      }
     }
   }
 });
@@ -359,6 +438,8 @@ function createBattleRecord(result, isVictory) {
     if (!playerData) return;
     
     let vehicleName = "Невідома техніка";
+    let vehicleLevel = 0;
+    let vehicleClass = "";
     let damageDealt = 0;
     let frags = 0;
     
@@ -374,6 +455,13 @@ function createBattleRecord(result, isVictory) {
           break;
         }
       }
+    }
+    
+    // Для поточного гравця використовуємо інформацію про танк, збережену під час бою
+    if (playerId === currentPlayerId && currentBattleStats.vehicles[playerId]) {
+      vehicleName = currentBattleStats.vehicles[playerId].name || vehicleName;
+      vehicleLevel = currentBattleStats.vehicles[playerId].level || 0;
+      vehicleClass = currentBattleStats.vehicles[playerId].class || "";
     }
     
     // Для поточного гравця використовуємо відстежену шкоду
@@ -396,7 +484,9 @@ function createBattleRecord(result, isVictory) {
       name: playerData.name,
       damage: damageDealt,
       frags: frags,
-      vehicle: vehicleName
+      vehicle: vehicleName,
+      level: vehicleLevel,
+      class: vehicleClass
     };
   });
   
@@ -459,7 +549,9 @@ function showSaveNotification() {
   
   // Видаляємо повідомлення через 3 секунди
   setTimeout(() => {
-    document.body.removeChild(notification);
+    if (document.body.contains(notification)) {
+      document.body.removeChild(notification);
+    }
   }, 3000);
 }
 
@@ -479,8 +571,37 @@ function sendBattleDataToGitHub(battleData) {
     // Якщо вікно не відкрилося, показуємо повідомлення
     if (!newWindow) {
       console.log("Не вдалося відкрити вікно для GitHub Issue");
-      alert("Клацніть 'OK', щоб перейти на GitHub і зберегти результати бою. Це допоможе зберегти вашу статистику назавжди.");
-      window.open(issueUrl, '_blank');
+      
+      // Створюємо і показуємо кнопку для ручного відкриття
+      const saveBtn = document.createElement('button');
+      saveBtn.textContent = "Зберегти бій на GitHub";
+      saveBtn.style.position = 'fixed';
+      saveBtn.style.bottom = '20px';
+      saveBtn.style.left = '20px';
+      saveBtn.style.padding = '10px 15px';
+      saveBtn.style.backgroundColor = '#4e54c8';
+      saveBtn.style.color = 'white';
+      saveBtn.style.border = 'none';
+      saveBtn.style.borderRadius = '4px';
+      saveBtn.style.fontSize = '14px';
+      saveBtn.style.fontWeight = '500';
+      saveBtn.style.cursor = 'pointer';
+      saveBtn.style.zIndex = '9999';
+      
+      saveBtn.addEventListener('click', () => {
+        window.open(issueUrl, '_blank');
+        if (document.body.contains(saveBtn)) {
+          document.body.removeChild(saveBtn);
+        }
+      });
+      
+      document.body.appendChild(saveBtn);
+      
+      setTimeout(() => {
+        if (document.body.contains(saveBtn)) {
+          document.body.removeChild(saveBtn);
+        }
+      }, 30000); // Видаляємо через 30 секунд
     }
     
     console.log('Дані бою відправлено на GitHub');
@@ -525,6 +646,13 @@ sdk.data.battle.onBattleResult.watch(result => {
     console.error("Invalid battle result data");
     return;
   }
+  
+  // Запобігаємо повторній обробці результатів
+  if (currentBattleStats.resultProcessed) {
+    return;
+  }
+  
+  currentBattleStats.resultProcessed = true;
   
   // Перевірка на перемогу (лише один раз для всієї команди)
   const currentPlayerId = sdk.data.player.id.value;
@@ -597,13 +725,14 @@ sdk.data.battle.onBattleResult.watch(result => {
     }
   });
   
+  // Оновлюємо UI перед збереженням даних
+  updatePlayersUI();
+  
   // Створюємо і зберігаємо запис бою в історію
   const battleRecord = createBattleRecord(result, isVictory);
   if (battleRecord) {
     saveBattleToHistory(battleRecord);
   }
-  
-  updatePlayersUI();
 });
 
 // Додаємо кнопку оновлення для примусового оновлення взводу
@@ -649,6 +778,9 @@ function addRefreshButton() {
 
 // Ініціалізація віджета
 function initializeWidget() {
+  // Завантажуємо збережені дані
+  loadStatsFromLocalStorage();
+  
   // Додаємо кнопку оновлення взводу
   addRefreshButton();
   
