@@ -1,12 +1,6 @@
 const { WidgetSDK } = WotstatWidgetsSdk;
 const sdk = new WidgetSDK();
 
-// На початку скрипта
-if (window.location.search.includes('clearcache=true')) {
-  localStorage.clear();
-  window.location.href = window.location.pathname;
-}
-
 // Зберігаємо дані про гравців
 const players = {};
 const platoonIds = new Set();
@@ -20,24 +14,21 @@ const teamStats = {
   points: 0
 };
 
-// Масив для збереження історії боїв
-let battleHistory = [];
-
 // Дані для відстеження поточного бою
 const currentBattleStats = {
   isActive: false,
   playersInitialDamage: {},
   playersInitialKills: {},
-  fragsThisBattle: {},  // Відстеження фрагів для кожного гравця в поточному бою
-  map: "", // Зберігання назви мапи
-  startTime: null, // Час початку бою
-  vehicles: {} // Техніка гравців
+  fragsThisBattle: {},
+  map: "",
+  startTime: null,
+  vehicles: {}
 };
 
 // Константи
 const POINTS_PER_DAMAGE = 1;
 const POINTS_PER_FRAG = 400;
-const POINTS_PER_TEAM_WIN = 1000; // очок на команду за перемогу
+const POINTS_PER_TEAM_WIN = 1000;
 
 // Ініціалізація даних гравця
 function initPlayer(id, name) {
@@ -70,7 +61,7 @@ function calculateTeamPoints() {
     basePoints += calculatePlayerPoints(player);
   });
   
-  // Додаємо очки за перемоги для всієї команди (1000 за кожну перемогу)
+  // Додаємо очки за перемоги для всієї команди
   basePoints += teamStats.victories * POINTS_PER_TEAM_WIN;
   
   return basePoints;
@@ -111,7 +102,7 @@ function updatePlayersUI() {
     const player = players[id];
     if (!player) return;
     
-    // Розрахунок очок для гравця (БЕЗ перемог, тільки пошкодження + фраги)
+    // Розрахунок очок для гравця
     const playerPoints = calculatePlayerPoints(player);
     
     // Створюємо рядок гравця
@@ -157,7 +148,7 @@ function saveInitialBattleStats() {
     
     currentBattleStats.playersInitialDamage[id] = player.damage;
     currentBattleStats.playersInitialKills[id] = player.kills;
-    currentBattleStats.fragsThisBattle[id] = 0; // Початок нового бою, 0 фрагів
+    currentBattleStats.fragsThisBattle[id] = 0;
   });
   
   // Зберігаємо інформацію про мапу
@@ -181,9 +172,6 @@ function cleanupPlayers() {
   
   // Оновлюємо UI
   updatePlayersUI();
-  
-  // Зберігаємо оновлену статистику
-  saveStats();
 }
 
 // Отримання даних про взвод
@@ -286,19 +274,6 @@ sdk.data.battle.isInBattle.watch((inBattle) => {
     // Збільшуємо лічильник боїв при вході в бій
     teamStats.battles++;
     
-    // Зберігаємо початковий стан перед боєм для історії
-    const stateBefore = {
-      players: JSON.parse(JSON.stringify(players)),
-      teamStats: JSON.parse(JSON.stringify(teamStats))
-    };
-    
-    // Додаємо новий запис у історію боїв
-    battleHistory.push({
-      timestamp: Date.now(),
-      stateBefore: stateBefore,
-      isComplete: false // Позначаємо, що бій ще не завершений
-    });
-    
     saveInitialBattleStats();
     
     // Оновлюємо UI, щоб відобразити новий лічильник боїв
@@ -327,9 +302,36 @@ sdk.data.battle.efficiency.damage.watch((newDamage, oldDamage) => {
       
       // Оновлюємо UI
       updatePlayersUI();
+    }
+  }
+});
+
+// ВИПРАВЛЕННЯ: Відстеження загальної шкоди (включно з блайндшотом)
+sdk.data.battle.personal.damageDealt.watch((newDamage, oldDamage) => {
+  if (!currentBattleStats.isActive) return;
+  
+  const currentPlayerId = sdk.data.player.id.value;
+  if (!currentPlayerId) return;
+  
+  // Отримуємо початкове значення шкоди для цього бою
+  const initialDamage = currentBattleStats.playersInitialDamage[currentPlayerId] || 0;
+  
+  // Отримуємо поточне значення шкоди гравця
+  const player = players[currentPlayerId];
+  if (!player) return;
+  
+  // Обчислюємо правильну шкоду для відображення
+  // Важливо: використовуємо новий damageDealt, який враховує всю шкоду
+  if (newDamage !== undefined && newDamage > 0) {
+    // Оновлюємо шкоду гравця на основі загальної шкоди з поля damageDealt
+    const currentTotalDamage = initialDamage + newDamage;
+    
+    // Оновлюємо тільки якщо нове значення більше поточного
+    if (currentTotalDamage > player.damage) {
+      player.damage = currentTotalDamage;
       
-      // Зберігаємо в localStorage
-      saveStats();
+      // Оновлюємо UI
+      updatePlayersUI();
     }
   }
 });
@@ -352,9 +354,6 @@ function updatePlayerKill(playerId, playerName) {
   
   // Оновлюємо UI
   updatePlayersUI();
-  
-  // Зберігаємо в localStorage
-  saveStats();
 }
 
 // Відстеження фрагів через PlayerFeedback
@@ -383,7 +382,7 @@ sdk.data.battle.onBattleResult.watch(result => {
   
   if (result.players[currentPlayerId] && result.common && result.common.winnerTeam) {
     if (parseInt(result.players[currentPlayerId].team) === parseInt(result.common.winnerTeam)) {
-      // Додаємо перемогу для всієї команди (а не для кожного гравця окремо)
+      // Додаємо перемогу для всієї команди
       teamStats.victories++;
       isVictory = true;
     }
@@ -416,17 +415,27 @@ sdk.data.battle.onBattleResult.watch(result => {
         }
       }
     } else {
-      // Для поточного гравця - шкода вже оновлена в реальному часі
-      // Перевіряємо фраги - якщо в результатах більше, ніж відстежено в бою, оновлюємо
+      // Для поточного гравця - перевіряємо значення з результатів бою
       for (const vehicleId in result.vehicles) {
         const vehicles = result.vehicles[vehicleId];
         
         for (const vehicle of vehicles) {
           if (vehicle.accountDBID === playerId) {
+            // ВИПРАВЛЕННЯ: Враховуємо загальну шкоду з результатів бою
+            const damageInResult = vehicle.damageDealt || 0;
+            const initialDamage = currentBattleStats.playersInitialDamage[playerId] || 0;
+            const currentDamage = playerData.damage;
+            
+            // Якщо шкода з результатів більша, оновлюємо значення
+            const expectedDamage = initialDamage + damageInResult;
+            if (expectedDamage > currentDamage) {
+              playerData.damage = expectedDamage;
+            }
+            
+            // Також перевіряємо фраги
             const fragsInBattle = currentBattleStats.fragsThisBattle[playerId] || 0;
             const fragsInResult = vehicle.kills || 0;
             
-            // Якщо фрагів в результатах більше, додаємо різницю
             if (fragsInResult > fragsInBattle) {
               playerData.kills += (fragsInResult - fragsInBattle);
             }
@@ -438,195 +447,13 @@ sdk.data.battle.onBattleResult.watch(result => {
     }
   });
   
-  // Оновлюємо запис в історії
-  if (battleHistory.length > 0) {
-    const lastBattleIndex = battleHistory.length - 1;
-    const lastBattle = battleHistory[lastBattleIndex];
-    
-    // Оновлюємо останній запис, якщо він не був завершений
-    if (!lastBattle.isComplete) {
-      lastBattle.stateAfter = {
-        players: JSON.parse(JSON.stringify(players)),
-        teamStats: JSON.parse(JSON.stringify(teamStats))
-      };
-      lastBattle.isComplete = true;
-      
-      // Додаємо інформацію про бій
-      const battleLogId = Date.now().toString();
-      lastBattle.battleLogId = battleLogId;
-      
-      battleHistory[lastBattleIndex] = lastBattle;
-      
-      // Обмежуємо довжину історії (зберігаємо останні 10 боїв)
-      if (battleHistory.length > 10) {
-        battleHistory.shift();
-      }
-      
-      // Зберігаємо історію
-      localStorage.setItem('wotPlatoonBattleHistory', JSON.stringify(battleHistory));
-    }
-  }
-  
-  // Створюємо детальний запис про бій для зовнішнього зберігання
-  const battleDetails = {
-    id: Date.now().toString(),
-    timestamp: Date.now(),
-    map: currentBattleStats.map || "Unknown Map",
-    victory: isVictory,
-    players: {},
-    duration: Math.floor((Date.now() - currentBattleStats.startTime) / 1000) || 0
-  };
-  
-  // Додаємо дані кожного гравця з взводу
-  Array.from(platoonIds).forEach(playerId => {
-    if (!result.players[playerId]) return;
-    const playerData = players[playerId];
-    if (!playerData) return;
-    
-    let playerVehicle = "Unknown Vehicle";
-    // Знаходимо інформацію про техніку гравця
-    for (const vehicleId in result.vehicles) {
-      const vehicles = result.vehicles[vehicleId];
-      for (const vehicle of vehicles) {
-        if (vehicle.accountDBID === playerId) {
-          playerVehicle = vehicle.vehicleName || playerVehicle;
-          break;
-        }
-      }
-    }
-    
-    // Розраховуємо шкоду в цьому бою
-    let playerDamage = 0;
-    if (playerId === currentPlayerId) {
-      const initialDamage = currentBattleStats.playersInitialDamage[playerId] || 0;
-      playerDamage = playerData.damage - initialDamage;
-    } else {
-      // Для інших гравців шукаємо шкоду в результатах
-      for (const vehicleId in result.vehicles) {
-        const vehicles = result.vehicles[vehicleId];
-        for (const vehicle of vehicles) {
-          if (vehicle.accountDBID === playerId) {
-            playerDamage = vehicle.damageDealt || 0;
-            break;
-          }
-        }
-      }
-    }
-    
-    // Розраховуємо фраги в цьому бою
-    let playerFrags = 0;
-    if (playerId === currentPlayerId) {
-      playerFrags = currentBattleStats.fragsThisBattle[playerId] || 0;
-    } else {
-      // Для інших гравців шукаємо фраги в результатах
-      for (const vehicleId in result.vehicles) {
-        const vehicles = result.vehicles[vehicleId];
-        for (const vehicle of vehicles) {
-          if (vehicle.accountDBID === playerId) {
-            playerFrags = vehicle.kills || 0;
-            break;
-          }
-        }
-      }
-    }
-    
-    // Додаємо детальну інформацію про гравця
-    battleDetails.players[playerId] = {
-      name: playerData.name,
-      damage: playerDamage,
-      frags: playerFrags,
-      vehicle: playerVehicle
-    };
-  });
-  
-  // Відправляємо дані бою до зовнішнього сховища
-  sendBattleDataToExternalStorage(battleDetails);
-  
   updatePlayersUI();
-  
-  // Зберігаємо дані в localStorage для збереження між оновленнями
-  saveStats();
 });
 
-// Функція для збереження даних бою через GitHub Issue
-function sendBattleDataToExternalStorage(battleData) {
-  try {
-    // Створюємо заголовок та тіло issue
-    const issueTitle = `Add battle data for ${new Date().toISOString().split('T')[0]}`;
-    const issueBody = JSON.stringify(battleData, null, 2);
-    
-    // Створюємо URL для створення issue
-    const issueUrl = `https://github.com/juniorapi/testwot/issues/new?title=${encodeURIComponent(issueTitle)}&body=${encodeURIComponent(issueBody)}&labels=battle-data`;
-    
-    // Відкриваємо нове вікно для створення issue
-    window.open(issueUrl, '_blank');
-    
-    console.log('Battle data submitted as GitHub issue');
-  } catch (e) {
-    console.error("Failed to send battle data:", e);
-  }
+// Завантаження статистики при запуску віджета
+function initializeWidget() {
+  updatePlayersUI();
 }
 
-// Функція для видалення бою через GitHub Issue
-function deleteBattleFromExternalStorage(battleId) {
-  try {
-    // Створюємо заголовок та тіло issue
-    const issueTitle = `Delete battle ${battleId}`;
-    const issueBody = `Please delete battle with ID: ${battleId}`;
-    
-    // Створюємо URL для створення issue
-    const issueUrl = `https://github.com/juniorapi/testwot/issues/new?title=${encodeURIComponent(issueTitle)}&body=${encodeURIComponent(issueBody)}&labels=delete-battle`;
-    
-    // Відкриваємо нове вікно для створення issue
-    window.open(issueUrl, '_blank');
-    
-    console.log('Delete request submitted as GitHub issue');
-    return true;
-  } catch (e) {
-    console.error("Failed to submit delete request:", e);
-    return false;
-  }
-}
-
-// Функції для збереження і завантаження статистики
-function saveStats() {
-  localStorage.setItem('wotPlatoonStats', JSON.stringify({
-    players: players,
-    teamStats: teamStats,
-    platoonIds: Array.from(platoonIds)
-  }));
-}
-
-function loadStats() {
-  const saved = localStorage.getItem('wotPlatoonStats');
-  if (saved) {
-    try {
-      const data = JSON.parse(saved);
-      
-      // Відновлюємо дані гравців
-      if (data.players) {
-        Object.assign(players, data.players);
-      }
-      
-      // Відновлюємо командну статистику
-      if (data.teamStats) {
-        Object.assign(teamStats, data.teamStats);
-      }
-      
-      // Відновлюємо ID гравців взводу
-      if (data.platoonIds) {
-        data.platoonIds.forEach(id => platoonIds.add(id));
-      }
-      
-      // Відновлюємо історію боїв
-      const savedHistory = localStorage.getItem('wotPlatoonBattleHistory');
-      if (savedHistory) {
-        battleHistory = JSON.parse(savedHistory);
-      }
-      
-      updatePlayersUI();
-    } catch (e) {
-      console.error("Error loading saved stats:", e);
-    }
-  }
-}
+// Запуск віджета
+initializeWidget();
