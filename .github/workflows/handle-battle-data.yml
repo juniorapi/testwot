@@ -10,12 +10,12 @@ jobs:
     if: contains(github.event.issue.labels.*.name, 'battle-data') || contains(github.event.issue.labels.*.name, 'delete-battle')
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         
       - name: Setup Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
-          node-version: '14'
+          node-version: '18'
           
       - name: Process Issue
         env:
