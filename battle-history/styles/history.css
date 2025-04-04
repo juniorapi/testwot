@@ -1,0 +1,292 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+body {
+  font-family: 'Roboto', sans-serif;
+  background-color: #1a1a1a;
+  color: #fff;
+  margin: 0;
+  padding: 20px;
+}
+
+.container {
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+h1 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #fff;
+  font-size: 28px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: rgba(40, 40, 40, 0.7);
+  border-radius: 8px;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  margin-right: 15px;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.filter-actions {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 10px;
+}
+
+select, input, button {
+  background-color: #3a3a3a;
+  color: white;
+  border: 1px solid #555;
+  padding: 8px 12px;
+  border-radius: 4px;
+}
+
+button {
+  cursor: pointer;
+  background-color: #4e54c8;
+}
+
+button:hover {
+  background-color: #373b9d;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-green {
+  background-color: #4CAF50;
+}
+
+.btn-green:hover {
+  background-color: #3E8E41;
+}
+
+.battle-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-bottom: 30px;
+}
+
+.battle-table th, 
+.battle-table td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #333;
+}
+
+.battle-table th {
+  background-color: #2c2c2c;
+  color: #ddd;
+  font-weight: 500;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.battle-table tbody tr {
+  background-color: rgba(40, 40, 40, 0.5);
+}
+
+.battle-table tbody tr:hover {
+  background-color: rgba(60, 60, 60, 0.7);
+}
+
+.victory { color: #4ee100; font-weight: bold; }
+.defeat { color: #ff4040; font-weight: bold; }
+.draw { color: #ffd700; font-weight: bold; }
+.inBattle { color: #ff00ea; font-weight: bold; }
+.damage { color: #ff9c00; }
+.frags { color: #4ee100; }
+.points { color: #4ee100; }
+
+.table-player {
+  display: block;
+  padding: 3px 0;
+}
+
+.table-player:not(:last-child) {
+  border-bottom: 1px solid rgba(80, 80, 80, 0.3);
+  margin-bottom: 3px;
+}
+
+.actions {
+  display: flex;
+  gap: 5px;
+}
+
+.btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.btn-view { background-color: #4e54c8; color: white; }
+.btn-delete { background-color: #c82a2a; color: white; }
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
+  margin-bottom: 30px;
+}
+
+.pagination button {
+  padding: 8px 15px;
+  background-color: #333;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.pagination button.active {
+  background-color: #4e54c8;
+}
+
+.battle-details {
+  background-color: rgba(40, 40, 40, 0.7);
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+  margin-bottom: 30px;
+  display: none;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #555;
+  padding-bottom: 15px;
+}
+
+.player-performance {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.player-performance th, 
+.player-performance td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #333;
+}
+
+.summary-stats {
+  margin-top: 30px;
+  margin-bottom: 30px;
+  background-color: rgba(40, 40, 40, 0.7);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.stats-header {
+  margin-bottom: 15px;
+  border-bottom: 1px solid #555;
+  padding-bottom: 10px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.stat-card {
+  background-color: rgba(50, 50, 50, 0.7);
+  border-radius: 6px;
+  padding: 15px;
+  transition: transform 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.stat-title {
+  font-size: 14px;
+  color: #aaa;
+  margin-bottom: 5px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.stat-value.damage { color: #ff9c00; }
+.stat-value.frags { color: #4ee100; }
+.stat-value.wins { color: #4ee100; }
+.stat-value.total-points { color: #4ee100; }
+
+.player-name-primary { color: #4ee100; font-weight: 500; }
+.player-name-secondary { color: #ffe100; font-weight: 500; }
+.player-name-tertiary { color: #ff9c00; font-weight: 500; }
+
+.close-details {
+  text-align: right;
+  margin-top: 20px;
+}
+
+@media (max-width: 1400px) {
+  .stats-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 1200px) {
+  .battle-table th, 
+  .battle-table td {
+    padding: 10px 12px;
+  }
+}
+
+@media (max-width: 992px) {
+  .filter-row {
+    flex-direction: column;
+  }
+  
+  .filter-group {
+    width: 100%;
+    margin-right: 0;
+  }
+  
+  .filter-group select,
+  .filter-group input {
+    width: 100%;
+  }
+  
+  .battle-table {
+    display: block;
+    overflow-x: auto;
+  }
+}
