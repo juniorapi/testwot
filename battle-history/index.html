@@ -76,7 +76,7 @@
                     <th>Шкода</th>
                     <th>Фраги</th>
                     <th>Очки</th>
-                    <th>Тривалість</th>
+                    <th>Загальні очки</th>
                     <th>Дії</th>
                 </tr>
             </thead>
@@ -89,34 +89,49 @@
             <!-- Пагінація буде додана динамічно -->
         </div>
 
-        <div class="battle-details" id="battle-details" style="display: none;">
-            <div class="detail-header">
-                <div>
-                    <h2 id="detail-map">Назва мапи</h2>
-                    <p id="detail-time">Дата і час</p>
+        <!-- Модальне вікно з деталями бою -->
+        <div id="battle-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="modal-header-info">
+                        <h2 id="detail-map">Назва мапи</h2>
+                        <p id="detail-time">Дата і час</p>
+                    </div>
+                    <div class="modal-header-result">
+                        <h3 id="detail-result">Результат</h3>
+                        <p id="detail-duration">Тривалість: 0:00</p>
+                    </div>
+                    <button id="close-modal" class="close-modal">&times;</button>
                 </div>
-                <div>
-                    <h3 id="detail-result">Результат</h3>
-                    <p id="detail-duration">Тривалість: 0:00</p>
+                
+                <div class="modal-body">
+                    <h3>Сумарні Результати за бій</h3>
+                    <div class="stat-summary">
+                        <div class="stat-summary-item">
+                            <div class="stat-icon">
+                                <i class="fas fa-bolt"></i>
+                            </div>
+                            <div class="stat-value damage" id="modal-damage">0</div>
+                            <div class="stat-label">Шкода</div>
+                        </div>
+                        
+                        <div class="stat-summary-item">
+                            <div class="stat-icon">
+                                <i class="fas fa-skull"></i>
+                            </div>
+                            <div class="stat-value frags" id="modal-frags">0</div>
+                            <div class="stat-label">Фраги</div>
+                        </div>
+                        
+                        <div class="stat-summary-item">
+                            <div class="stat-icon">
+                                <i class="fas fa-trophy"></i>
+                            </div>
+                            <div class="stat-value total-points" id="modal-points">0</div>
+                            <div class="stat-label">Очки</div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-
-            <h3>Сумарні Результати за бій</h3>
-            <table class="player-performance">
-                <thead>
-                    <tr>
-                        <th>Шкода</th>
-                        <th>фраги</th>
-                        <th>Очки</th>
-                    </tr>
-                </thead>
-                <tbody id="detail-players">
-                    <!-- Дані про гравців будуть додані динамічно -->
-                </tbody>
-            </table>
-
-            <div class="close-details">
-                <button id="close-details" class="btn">Закрити</button>
             </div>
         </div>
 
