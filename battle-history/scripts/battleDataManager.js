@@ -30,7 +30,7 @@ class BattleDataManager {
   clearState() {
     localStorage.removeItem('gameState');
 
-      this.BattleStats = {};
+    this.BattleStats = {};
   }
 
   sleep(ms) {
@@ -52,7 +52,11 @@ class BattleDataManager {
     let battlePoints = 0;
     let battleDamage = 0;
     let battleKills = 0;
-    battle.win == 1 ? battlePoints += this.POINTS_PER_TEAM_WIN : battlePoints += 0;
+    
+    // Додаємо бонусні очки за перемогу команди
+    if (battle.win === 1) {
+      battlePoints += this.POINTS_PER_TEAM_WIN;
+    }
 
     if (battle && battle.players) {
       Object.values(battle.players).forEach(player => {
@@ -188,9 +192,8 @@ class BattleDataManager {
     return false;
   }
 
-  // ВИПРАВЛЕННЯ: Переписали метод applyFilters для коректної роботи фільтрації
   async applyFilters(filters) {
-    // Отримуємо всі бої з this.BattleStats замість використання неіснуючого this.allBattles
+    // Отримуємо всі бої
     let filteredBattles = this.getBattlesArray();
 
     // Фільтруємо за мапою
