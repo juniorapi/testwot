@@ -171,6 +171,31 @@ button:hover {
   background-color: rgba(60, 60, 60, 0.7);
 }
 
+/* Виправлені стилі для найгіршого бою */
+.worst-battle {
+  background-color: rgba(255, 50, 50, 0.15) !important;
+}
+
+.worst-battle:hover {
+  background-color: rgba(255, 50, 50, 0.25) !important;
+}
+
+.worst-battle td:first-child {
+  position: relative;
+  padding-left: 25px; /* Додатковий відступ для індикатора */
+}
+
+.worst-battle td:first-child::before {
+  content: "‼";
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #ff3232;
+  font-weight: bold;
+  font-size: 16px;
+}
+
 .victory { color: #4ee100; font-weight: bold; }
 .defeat { color: #ff4040; font-weight: bold; }
 .draw { color: #ffd700; font-weight: bold; }
@@ -428,27 +453,6 @@ button:hover {
 .player-name-primary { color: #4ee100; font-weight: 500; }
 .player-name-secondary { color: #ffe100; font-weight: 500; }
 .player-name-tertiary { color: #ff9c00; font-weight: 500; }
-
-/* Підсвічування найгіршого бою */
-.worst-battle {
-  background-color: rgba(255, 50, 50, 0.15) !important;
-  position: relative;
-}
-
-.worst-battle:hover {
-  background-color: rgba(255, 50, 50, 0.25) !important;
-}
-
-.worst-battle::before {
-  content: "‼";
-  position: absolute;
-  left: 5px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #ff3232;
-  font-weight: bold;
-  font-size: 16px;
-}
 
 /* Підсвічування найгіршого бою в модальному вікні */
 .worst-battle-modal {
