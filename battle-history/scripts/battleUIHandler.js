@@ -6,11 +6,15 @@ class BattleUIHandler {
         this.setupEventListeners();
         this.initializeUI();
 
+        // Змінна для зберігання ID найгіршого бою
+        this.worstBattleId = null;
+
         // Підписка на події від менеджера даних
         this.dataManager.eventsHistory.on('statsUpdated', () => this.updateStats());
         
         // Обробник події filtersApplied для отримання відфільтрованих даних
         this.dataManager.eventsHistory.on('filtersApplied', (filteredBattles) => {
+            this.findWorstBattle(filteredBattles);
             this.updateBattleTable(filteredBattles);
         });
         
@@ -31,6 +35,8 @@ class BattleUIHandler {
 
     async initializeUI() {
         await this.dataManager.loadFromServer();
+        // Знаходимо найгірший бій при ініціалізації
+        this.findWorstBattle();
         this.updateBattleTable();
         this.updateStats();
         this.setupFilters();
@@ -62,6 +68,40 @@ class BattleUIHandler {
                 this.closeModal();
             }
         });
+    }
+
+    // Метод для знаходження найгіршого бою
+    findWorstBattle(battles = null) {
+        const allBattles = battles || this.dataManager.getBattlesArray();
+        
+        if (!allBattles || allBattles.length === 0) {
+            this.worstBattleId = null;
+            return;
+        }
+
+        // Фільтруємо тільки завершені бої (не "в бою")
+        const completedBattles = allBattles.filter(battle => battle.win !== -1);
+        
+        if (completedBattles.length === 0) {
+            this.worstBattleId = null;
+            return;
+        }
+
+        // Знаходимо найгірший бій (з найменшою кількістю очок)
+        let worstBattle = completedBattles[0];
+        let worstBattlePoints = this.dataManager.calculateBattleData(worstBattle).battlePoints;
+
+        completedBattles.forEach(battle => {
+            const battleData = this.dataManager.calculateBattleData(battle);
+            // Перевіряємо, чи це поразка з меншою кількістю очок
+            if (battle.win === 0 && battleData.battlePoints < worstBattlePoints) {
+                worstBattle = battle;
+                worstBattlePoints = battleData.battlePoints;
+            }
+        });
+
+        this.worstBattleId = worstBattle.id;
+        console.log('Знайдено найгірший бій:', this.worstBattleId, 'з очками:', worstBattlePoints);
     }
 
     setupFilters() {
@@ -122,6 +162,9 @@ class BattleUIHandler {
         // Застосовуємо фільтри та отримуємо результат
         const filteredBattles = await this.dataManager.applyFilters(filters);
         console.log('Відфільтровані бої:', filteredBattles);
+        
+        // Оновлюємо найгірший бій для відфільтрованих результатів
+        this.findWorstBattle(filteredBattles);
     }
 
     clearFilters() {
@@ -160,6 +203,11 @@ class BattleUIHandler {
     createBattleRow(battle) {
         if (!battle) return;
         const row = document.createElement('tr');
+        
+        // Якщо це найгірший бій, додаємо спеціальний клас
+        if (battle.id === this.worstBattleId) {
+            row.classList.add('worst-battle');
+        }
 
         const date = battle.startTime ? new Date(battle.startTime) : new Date();
 
@@ -257,6 +305,26 @@ class BattleUIHandler {
 
         // Оновлення блоку зі статистикою
         this.updateBattleStatistics(battle);
+        
+        // Показуємо спеціальну мітку для найгіршого бою
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+            if (battle.id === this.worstBattleId) {
+                modalContent.classList.add('worst-battle-modal');
+                
+                // Додаємо мітку "Найгірший бій" якщо її ще немає
+                if (!modal.querySelector('.worst-battle-badge')) {
+                    const badge = document.createElement('div');
+                    badge.className = 'worst-battle-badge';
+                    badge.textContent = 'Найгірший бій';
+                    modalContent.querySelector('.modal-header').appendChild(badge);
+                }
+            } else {
+                modalContent.classList.remove('worst-battle-modal');
+                const badge = modal.querySelector('.worst-battle-badge');
+                if (badge) badge.remove();
+            }
+        }
         
         // Відображення модального вікна
         modal.style.display = 'block';
