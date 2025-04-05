@@ -84,11 +84,17 @@ button:hover {
   background-color: #3E8E41;
 }
 
+/* Таблиця битв - додаємо контейнер для прокрутки */
+.battle-table-container {
+  width: 100%;
+  overflow-x: auto;
+  margin-bottom: 30px;
+}
+
 .battle-table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  margin-bottom: 30px;
 }
 
 .battle-table th, 
@@ -96,6 +102,56 @@ button:hover {
   padding: 12px 15px;
   text-align: left;
   border-bottom: 1px solid #333;
+}
+
+/* Фіксуємо ширину колонок */
+.battle-table th:first-child,
+.battle-table td:first-child {
+  min-width: 150px; /* Дата */
+}
+
+.battle-table th:nth-child(2),
+.battle-table td:nth-child(2) {
+  min-width: 120px; /* Мапа */
+}
+
+.battle-table th:nth-child(3),
+.battle-table td:nth-child(3) {
+  min-width: 90px; /* Результат */
+}
+
+.battle-table th:nth-child(4),
+.battle-table td:nth-child(4) {
+  min-width: 150px; /* Гравець */
+}
+
+.battle-table th:nth-child(5),
+.battle-table td:nth-child(5) {
+  min-width: 120px; /* Танк */
+}
+
+.battle-table th:nth-child(6),
+.battle-table td:nth-child(6),
+.battle-table th:nth-child(7),
+.battle-table td:nth-child(7),
+.battle-table th:nth-child(8),
+.battle-table td:nth-child(8) {
+  min-width: 80px; /* Шкода, Фраги, Очки */
+  text-align: right;
+}
+
+.battle-table th:nth-child(9),
+.battle-table td:nth-child(9) {
+  min-width: 120px; /* Загальні очки */
+  text-align: right;
+  white-space: nowrap;
+}
+
+.battle-table th:last-child,
+.battle-table td:last-child {
+  width: 80px;
+  min-width: 80px;
+  text-align: center;
 }
 
 .battle-table th {
@@ -373,64 +429,7 @@ button:hover {
 .player-name-secondary { color: #ffe100; font-weight: 500; }
 .player-name-tertiary { color: #ff9c00; font-weight: 500; }
 
-@media (max-width: 1400px) {
-  .stats-grid {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  }
-}
-
-@media (max-width: 1200px) {
-  .battle-table th, 
-  .battle-table td {
-    padding: 10px 12px;
-  }
-  
-  .modal-content {
-    width: 90%;
-  }
-}
-
-@media (max-width: 992px) {
-  .filter-row {
-    flex-direction: column;
-  }
-  
-  .filter-group {
-    width: 100%;
-    margin-right: 0;
-  }
-  
-  .filter-group select,
-  .filter-group input {
-    width: 100%;
-  }
-  
-  .battle-table {
-    display: block;
-    overflow-x: auto;
-  }
-  
-  .stat-summary {
-    flex-direction: column;
-  }
-}
-
-@media (max-width: 768px) {
-  .modal-content {
-    width: 95%;
-    margin: 10% auto;
-  }
-  
-  .modal-header {
-    flex-direction: column;
-  }
-  
-  .modal-header-result {
-    margin-right: 0;
-    margin-top: 10px;
-    text-align: left;
-  }
-}
+/* Підсвічування найгіршого бою */
 .worst-battle {
   background-color: rgba(255, 50, 50, 0.15) !important;
   position: relative;
@@ -475,4 +474,63 @@ button:hover {
   0% { transform: scale(1); }
   50% { transform: scale(1.05); }
   100% { transform: scale(1); }
+}
+
+/* Медіа-запити для адаптивності */
+@media (max-width: 1400px) {
+  .stats-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+  
+  .battle-table th, 
+  .battle-table td {
+    padding: 10px 12px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .battle-table {
+    min-width: 1100px;
+  }
+  
+  .modal-content {
+    width: 90%;
+  }
+}
+
+@media (max-width: 992px) {
+  .filter-row {
+    flex-direction: column;
+  }
+  
+  .filter-group {
+    width: 100%;
+    margin-right: 0;
+  }
+  
+  .filter-group select,
+  .filter-group input {
+    width: 100%;
+  }
+  
+  .stat-summary {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .modal-content {
+    width: 95%;
+    margin: 10% auto;
+  }
+  
+  .modal-header {
+    flex-direction: column;
+  }
+  
+  .modal-header-result {
+    margin-right: 0;
+    margin-top: 10px;
+    text-align: left;
+  }
 }
