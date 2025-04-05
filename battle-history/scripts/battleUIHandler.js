@@ -9,28 +9,24 @@ class BattleUIHandler {
         // Підписка на події від менеджера даних
         this.dataManager.eventsHistory.on('statsUpdated', () => this.updateStats());
         
-        // ВИПРАВЛЕННЯ: Змінено обробник події filtersApplied для отримання відфільтрованих даних
+        // Обробник події filtersApplied для отримання відфільтрованих даних
         this.dataManager.eventsHistory.on('filtersApplied', (filteredBattles) => {
             this.updateBattleTable(filteredBattles);
         });
         
-        // ВИПРАВЛЕННЯ: Додали обробник події видалення бою, щоб оновлювати інтерфейс
+        // Обробник події видалення бою для оновлення інтерфейсу
         this.dataManager.eventsHistory.on('battleDeleted', (battleId) => {
-
-                // Оновлюємо інтерфейс, щоб відобразити видалення
-                this.updateBattleTable();
-                this.updateStats();
-                this.setupFilters();
-
-        });
-
-        this.dataManager.eventsHistory.on('dataImported', (importedData) => {
-
+            // Оновлюємо інтерфейс, щоб відобразити видалення
             this.updateBattleTable();
             this.updateStats();
             this.setupFilters();
         });
 
+        this.dataManager.eventsHistory.on('dataImported', (importedData) => {
+            this.updateBattleTable();
+            this.updateStats();
+            this.setupFilters();
+        });
     }
 
     async initializeUI() {
@@ -49,8 +45,23 @@ class BattleUIHandler {
         document.getElementById('export-data')?.addEventListener('click', () => this.exportData());
         document.getElementById('import-data')?.addEventListener('click', () => this.importData());
 
-        // Деталі бою
-        document.getElementById('close-details')?.addEventListener('click', () => this.closeBattleDetails());
+        // Модальне вікно
+        document.getElementById('close-modal')?.addEventListener('click', () => this.closeModal());
+        
+        // Закриття модального вікна при кліку поза ним
+        window.addEventListener('click', (e) => {
+            const modal = document.getElementById('battle-modal');
+            if (e.target === modal) {
+                this.closeModal();
+            }
+        });
+        
+        // Закриття модального вікна по клавіші Escape
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.closeModal();
+            }
+        });
     }
 
     setupFilters() {
@@ -96,7 +107,6 @@ class BattleUIHandler {
         if (currentValue) filter.value = currentValue;
     }
 
-    // ВИПРАВЛЕННЯ: Переписано метод applyFilters для коректної роботи фільтрів
     async applyFilters() {
         const filters = {
             map: document.getElementById('map-filter')?.value || '',
@@ -124,7 +134,7 @@ class BattleUIHandler {
         this.applyFilters();
     }
 
-    // ВИПРАВЛЕННЯ: Оновлено метод updateBattleTable, щоб він приймав масив відфільтрованих боїв
+    // Оновлений метод для відображення таблиці боїв
     updateBattleTable(filteredBattles = null) {
         const tableBody = document.getElementById('battle-table-body');
         if (!tableBody) return;
@@ -168,9 +178,13 @@ class BattleUIHandler {
             resultClass = 'victory';
             resultText = 'Перемога';
         } else {
-            resultClass = 'drawn';
+            resultClass = 'draw';
             resultText = 'Нічия';
         }
+        
+        // Розрахунок загальних очок за бій
+        const battleData = this.dataManager.calculateBattleData(battle);
+        const totalBattlePoints = battleData.battlePoints;
 
         row.innerHTML = `
             <td>${date.toLocaleDateString()} ${date.toLocaleTimeString()}</td>
@@ -181,7 +195,7 @@ class BattleUIHandler {
             <td>${this.getDamage(battle)}</td>
             <td>${this.getKills(battle)}</td>
             <td>${this.getPoints(battle)}</td>
-            <td>${this.formatDuration(battle.duration || 0)}</td>
+            <td class="total-points">${totalBattlePoints.toLocaleString()}</td>
             <td>
                 <button class="view-battle" data-battle-id="${battle.id}">
                     <i class="fas fa-eye"></i>
@@ -192,7 +206,7 @@ class BattleUIHandler {
             </td>
         `;
 
-        // ВИПРАВЛЕННЯ: Виправлено передачу ID бою в обробники подій
+        // Виправлено передачу ID бою в обробники подій
         row.querySelector('.view-battle')?.addEventListener('click', () => this.showBattleDetails(battle));
         row.querySelector('.delete-battle')?.addEventListener('click', () => this.deleteBattle(battle.id));
 
@@ -201,56 +215,85 @@ class BattleUIHandler {
 
     showBattleDetails(battle) {
         if (!battle) return;
-        const detailsElement = document.getElementById('battle-details');
-        if (!detailsElement) return;
-
+        
+        const modal = document.getElementById('battle-modal');
+        if (!modal) return;
+        
+        // Деталі бою - заголовок
         const detailMap = document.getElementById('detail-map');
         const detailTime = document.getElementById('detail-time');
         const resultElement = document.getElementById('detail-result');
         const detailDuration = document.getElementById('detail-duration');
 
-        if (detailMap) detailMap.textContent = battle.mapName || 'Unknown Map';
-        if (detailTime) detailTime.textContent = battle.startTime ?
+        if (detailMap) detailMap.textContent = battle.mapName || 'Невідома мапа';
+        if (detailTime) detailTime.textContent = battle.startTime ? 
             new Date(battle.startTime).toLocaleString() : '-';
 
         if (resultElement) {
-            resultElement.textContent = battle.win === 1 ? 'Перемога' : 'Поразка';
-            resultElement.className = battle.win === 1 ? 'victory' : 'defeat';
+            let resultText = '';
+            let resultClass = '';
+            
+            if (battle.win === 1) {
+                resultText = 'Перемога';
+                resultClass = 'victory';
+            } else if (battle.win === 0) {
+                resultText = 'Поразка';
+                resultClass = 'defeat';
+            } else if (battle.win === 2) {
+                resultText = 'Нічия';
+                resultClass = 'draw';
+            } else {
+                resultText = 'В бою';
+                resultClass = 'inBattle';
+            }
+            
+            resultElement.textContent = resultText;
+            resultElement.className = resultClass;
         }
 
         if (detailDuration) {
             detailDuration.textContent = `Тривалість: ${this.formatDuration(battle.duration)}`;
         }
 
-        this.updatePlayerPerformance(battle);
-        detailsElement.style.display = 'block';
+        // Оновлення блоку зі статистикою
+        this.updateBattleStatistics(battle);
+        
+        // Відображення модального вікна
+        modal.style.display = 'block';
+        
+        // Додаємо клас для анімації появи
+        setTimeout(() => {
+            modal.querySelector('.modal-content')?.classList.add('show');
+        }, 10);
     }
 
-    updatePlayerPerformance(battle) {
-        const tbody = document.getElementById('detail-players');
-        if (!tbody || !battle.players) return;
-
-        tbody.innerHTML = '';
-        const battleData  = this.dataManager.calculateBattleData(battle);
-        const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${(battleData.battleDamage || 0).toLocaleString()}</td>
-                <td>${(battleData.battleKills || 0).toLocaleString()}</td>
-                <td>${(battleData.battlePoints || 0).toLocaleString()}</td>
-            `;
-            tbody.appendChild(row);
-
+    updateBattleStatistics(battle) {
+        if (!battle) return;
+        
+        const battleData = this.dataManager.calculateBattleData(battle);
+        
+        // Оновлюємо показники в модальному вікні
+        document.getElementById('modal-damage').textContent = battleData.battleDamage.toLocaleString();
+        document.getElementById('modal-frags').textContent = battleData.battleKills.toLocaleString();
+        document.getElementById('modal-points').textContent = battleData.battlePoints.toLocaleString();
     }
 
-    closeBattleDetails() {
-        const detailsElement = document.getElementById('battle-details');
-        if (detailsElement) detailsElement.style.display = 'none';
+    closeModal() {
+        const modal = document.getElementById('battle-modal');
+        if (modal) {
+            // Додаємо анімацію закриття
+            modal.querySelector('.modal-content')?.classList.remove('show');
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 200);
+        }
     }
 
     async deleteBattle(battleId) {
         if (confirm('Ви впевнені, що хочете видалити цей бій?')) {
             await this.dataManager.deleteBattle(battleId);
             this.updateBattleTable();
+            this.updateStats();
         }
     }
 
@@ -323,37 +366,37 @@ class BattleUIHandler {
     }
 
     getPlayerNames(battle) {
-        if (!battle.players) return 'Unknown Player';
+        if (!battle.players) return 'Невідомий гравець';
         return Object.values(battle.players)
-            .map(p => p.name || 'Unknown Player')
+            .map(p => p.name || 'Невідомий гравець')
             .join('<br>');
     }
 
     getDamage(battle) {
-        if (!battle.players) return 'Unknown Player';
+        if (!battle.players) return '0';
         return Object.values(battle.players)
-            .map(p => p.damage || 0)
+            .map(p => (p.damage || 0).toLocaleString())
             .join('<br>');
     }
 
     getKills(battle) {
-        if (!battle.players) return 'Unknown Player';
+        if (!battle.players) return '0';
         return Object.values(battle.players)
             .map(p => p.kills || 0)
             .join('<br>');
     }
 
     getPoints(battle) {
-        if (!battle.players) return 'Unknown Player';
+        if (!battle.players) return '0';
         return Object.values(battle.players)
-            .map(p => p.points || 0)
+            .map(p => (p.points || 0).toLocaleString())
             .join('<br>');
     }
 
     getVehicles(battle) {
-        if (!battle.players) return 'Unknown Player';
+        if (!battle.players) return 'Невідомий танк';
         return Object.values(battle.players)
-            .map(p => p.vehicle || 'Unknown Vehicle')
+            .map(p => p.vehicle || 'Невідомий танк')
             .join('<br>');
     }
 
@@ -368,10 +411,40 @@ class BattleUIHandler {
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
         notification.textContent = message;
+        
+        // Стилі для сповіщення
+        Object.assign(notification.style, {
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            padding: '12px 20px',
+            borderRadius: '4px',
+            color: 'white',
+            zIndex: '10000',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            animation: 'fadeIn 0.3s, fadeOut 0.3s 2.7s',
+            backgroundColor: type === 'success' ? '#4CAF50' : '#f44336'
+        });
+
+        // Додаємо стилі анімацій
+        const styleSheet = document.createElement('style');
+        styleSheet.textContent = `
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(20px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            
+            @keyframes fadeOut {
+                from { opacity: 1; transform: translateY(0); }
+                to { opacity: 0; transform: translateY(20px); }
+            }
+        `;
+        document.head.appendChild(styleSheet);
 
         document.body.appendChild(notification);
         setTimeout(() => {
             notification.remove();
+            styleSheet.remove();
         }, 3000);
     }
 }
