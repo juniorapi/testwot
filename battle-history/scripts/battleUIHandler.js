@@ -3,11 +3,12 @@ import BattleDataManager from './battleDataManager.js';
 class BattleUIHandler {
     constructor() {
         this.dataManager = new BattleDataManager();
-        this.setupEventListeners();
-        this.initializeUI();
-
+        
         // Змінна для зберігання ID найгіршого бою
         this.worstBattleId = null;
+        
+        this.setupEventListeners();
+        this.initializeUI();
 
         // Підписка на події від менеджера даних
         this.dataManager.eventsHistory.on('statsUpdated', () => this.updateStats());
@@ -87,14 +88,14 @@ class BattleUIHandler {
             return;
         }
 
-        // Знаходимо найгірший бій (з найменшою кількістю очок)
+        // Знаходимо найгірший бій (з найменшою кількістю загальних очок)
         let worstBattle = completedBattles[0];
         let worstBattlePoints = this.dataManager.calculateBattleData(worstBattle).battlePoints;
 
         completedBattles.forEach(battle => {
             const battleData = this.dataManager.calculateBattleData(battle);
-            // Перевіряємо, чи це поразка з меншою кількістю очок
-            if (battle.win === 0 && battleData.battlePoints < worstBattlePoints) {
+            // Перевіряємо, чи очки менші за поточного найгіршого бою
+            if (battleData.battlePoints < worstBattlePoints) {
                 worstBattle = battle;
                 worstBattlePoints = battleData.battlePoints;
             }
@@ -360,6 +361,8 @@ class BattleUIHandler {
     async deleteBattle(battleId) {
         if (confirm('Ви впевнені, що хочете видалити цей бій?')) {
             await this.dataManager.deleteBattle(battleId);
+            // Оновлюємо найгірший бій після видалення
+            this.findWorstBattle();
             this.updateBattleTable();
             this.updateStats();
         }
@@ -418,13 +421,17 @@ class BattleUIHandler {
                 try {
                     const data = JSON.parse(e.target?.result);
                     const success = await this.dataManager.importData(data);
-                    this.showNotification(
-                        success ? 'Дані успішно імпортовано' : 'Помилка при імпорті даних',
-                        success ? 'success' : 'error'
-                    );
+                    
+                    if (success) {
+                        // Перерахуємо найгірший бій після імпорту
+                        this.findWorstBattle();
+                        this.showNotification('Дані успішно імпортовано', 'success');
+                    } else {
+                        this.showNotification('Помилка при імпорті даних', 'error');
+                    }
                 } catch (error) {
                     console.error('Error importing data:', error);
-                    this.showNotification('Помилка при читанні файлу', error);
+                    this.showNotification('Помилка при читанні файлу', 'error');
                 }
             };
             reader.readAsText(file);
